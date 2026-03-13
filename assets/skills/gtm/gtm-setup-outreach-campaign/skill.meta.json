@@ -1,0 +1,15 @@
+{
+  "slug": "gtm-setup-outreach-campaign",
+  "category": "capabilities",
+  "tags": [
+    "outreach"
+  ],
+  "installation": {
+    "base_command": "npx goose-skills install setup-outreach-campaign",
+    "supports": [
+      "claude",
+      "cursor",
+      "codex"
+    ]
+  }
+}

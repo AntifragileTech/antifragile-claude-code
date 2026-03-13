@@ -1,0 +1,15 @@
+{
+  "slug": "gtm-trending-ad-hook-spotter",
+  "category": "composites",
+  "tags": [
+    "ads"
+  ],
+  "installation": {
+    "base_command": "npx goose-skills install trending-ad-hook-spotter",
+    "supports": [
+      "claude",
+      "cursor",
+      "codex"
+    ]
+  }
+}
