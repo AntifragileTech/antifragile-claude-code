@@ -2,6 +2,9 @@
 
 > Installs 40 security skills including Trail of Bits tools, vulnerability scanners, and fuzzing frameworks.
 
+> **💡 Tip**: For Claude to auto-discover and proactively use these assets, also run **Module 0: Core Setup** — it adds a Skill Auto-Discovery rule to your CLAUDE.md so Claude matches skills to tasks automatically.
+
+
 ## Copy this prompt into Claude Code:
 
 ```

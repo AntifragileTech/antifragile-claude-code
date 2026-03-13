@@ -2,6 +2,9 @@
 
 > Installs 188 skills for frameworks, languages, databases, testing, and general development.
 
+> **💡 Tip**: For Claude to auto-discover and proactively use these assets, also run **Module 0: Core Setup** — it adds a Skill Auto-Discovery rule to your CLAUDE.md so Claude matches skills to tasks automatically.
+
+
 ## Copy this prompt into Claude Code:
 
 ```

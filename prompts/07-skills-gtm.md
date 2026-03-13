@@ -2,6 +2,9 @@
 
 > Installs 86 go-to-market skills for SEO, ads, outreach, competitor intelligence, and content creation.
 
+> **💡 Tip**: For Claude to auto-discover and proactively use these assets, also run **Module 0: Core Setup** — it adds a Skill Auto-Discovery rule to your CLAUDE.md so Claude matches skills to tasks automatically.
+
+
 **Note**: Most scraping skills need an [Apify](https://apify.com) API token (`APIFY_API_TOKEN`). SEO skills optionally use Ahrefs/SEMrush via Apify actors. Outreach skills use [Smartlead](https://smartlead.ai) (`SMARTLEAD_API_KEY`).
 
 ## Copy this prompt into Claude Code:

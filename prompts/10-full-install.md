@@ -95,7 +95,7 @@ print(f"\nDone! Restart Claude Code for changes to take effect.")
 
 ### Step 3: Set up CLAUDE.md auto-discovery
 
-Check if ~/.claude/CLAUDE.md contains "Skill Auto-Discovery". If not, append the Skill Auto-Discovery section from the repo's prompts/00-core-setup.md instructions.
+Check if ~/.claude/CLAUDE.md exists. If not, create it. Then check if it already contains "Skill Auto-Discovery". If yes, skip this step. If not, read the file /tmp/ccpp/prompts/00-core-setup.md — it contains the exact block to append. Copy that block (everything between "## Skill Auto-Discovery" and the end marker) and append it to the END of ~/.claude/CLAUDE.md. This is critical — it tells Claude to auto-discover and proactively invoke skills when relevant tasks come up.
 
 ### Step 4: Clean up
 
