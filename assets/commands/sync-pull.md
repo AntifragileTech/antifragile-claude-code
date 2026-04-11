@@ -15,20 +15,23 @@ Run this BEFORE starting work to get updates from other team members or devices.
 
 | Type | Strategy | Why |
 |------|----------|-----|
-| Scripts (.sh) | ALWAYS update | Authored by us, not user-customized |
-| Commands (.md) | ALWAYS update | Authored by us, not user-customized |
-| Agents (.md) | ALWAYS update | Authored by us, not user-customized |
-| Rules (.md) | ALWAYS update | Authored by us, not user-customized |
-| Skills (.md) | Smart merge with checksum manifest | Users may customize — protect local edits |
-| Hooks (.sh) | ALWAYS update | Authored by us |
-| CLAUDE.md template | NEVER auto-apply | User heavily customizes |
+| Scripts (.sh) | Smart merge | Protect local edits, add new, update unmodified |
+| Commands (.md) | Smart merge | Protect local edits, add new, update unmodified |
+| Agents (.md) | Smart merge | Protect local edits, add new, update unmodified |
+| Rules (.md) | Smart merge | Protect local edits, add new, update unmodified |
+| Skills (.md) | Smart merge | Protect local edits, add new, update unmodified |
+| Hooks (.sh) | Smart merge | Protect local edits, add new, update unmodified |
+| CLAUDE.md (global) | Section-level smart merge | Merges missing `##` sections — never overwrites existing sections |
+| CLAUDE.md (project) | Insights merge only | Only `(Insights ...)` tagged sections are merged |
 | settings.json template | NEVER auto-apply | User has own settings |
 
 ## Rules (CRITICAL)
 - **NEVER delete** local files that don't exist in repo
-- **Skills with local edits**: backup → report → skip (don't overwrite user work)
-- **Everything else**: update freely — these are our authored files
-- Checksum manifest tracks what we last synced so we can detect local edits
+- **ALL file types use smart merge**: if a file exists locally and was edited since last sync, PROTECT it
+- **New files** (exist in repo but not locally): always add
+- **Unmodified files** (local matches last sync checksum): safe to update
+- **Modified files** (local differs from last sync checksum): PROTECTED — never overwritten
+- Checksum manifest (`.sync-manifest.json`) tracks what was last synced to detect local edits
 
 ## Steps
 
@@ -142,7 +145,7 @@ def sync_dir(src_dir, dst_dir, strategy="always_update", label=""):
             sync_file(f, dst_dir / rel, rel_key, strategy)
 
 # ============================================================
-# SYNC: Scripts (ALWAYS UPDATE)
+# SYNC: Scripts (SMART MERGE — protect local edits)
 # ============================================================
 print("Scripts:")
 scripts_src = REPO / "scripts"
@@ -151,27 +154,27 @@ if scripts_src.exists():
     for f in sorted(scripts_src.iterdir()):
         if f.is_file():
             dst = scripts_dst / f.name
-            sync_file(f, dst, f"scripts/{f.name}", "always_update")
+            sync_file(f, dst, f"scripts/{f.name}", "smart_merge")
             if dst.exists():
                 dst.chmod(0o755)
 
 # ============================================================
-# SYNC: Commands (ALWAYS UPDATE)
+# SYNC: Commands (SMART MERGE — protect local edits)
 # ============================================================
 print("\nCommands:")
-sync_dir(REPO / "commands", CLAUDE / "commands", "always_update", "commands")
+sync_dir(REPO / "commands", CLAUDE / "commands", "smart_merge", "commands")
 
 # ============================================================
-# SYNC: Agents (ALWAYS UPDATE)
+# SYNC: Agents (SMART MERGE — protect local edits)
 # ============================================================
 print("\nAgents:")
-sync_dir(REPO / "agents", CLAUDE / "agents", "always_update", "agents")
+sync_dir(REPO / "agents", CLAUDE / "agents", "smart_merge", "agents")
 
 # ============================================================
-# SYNC: Rules (ALWAYS UPDATE)
+# SYNC: Rules (SMART MERGE — protect local edits)
 # ============================================================
 print("\nRules:")
-sync_dir(REPO / "rules", CLAUDE / "rules", "always_update", "rules")
+sync_dir(REPO / "rules", CLAUDE / "rules", "smart_merge", "rules")
 
 # ============================================================
 # SYNC: Skills (SMART MERGE — protect user edits)
@@ -193,13 +196,13 @@ if skills_src.exists():
                     sync_file(f, local_skill / rel, rel_key, "smart_merge")
 
 # ============================================================
-# SYNC: Hooks script (ALWAYS UPDATE)
+# SYNC: Hooks script (SMART MERGE — protect local edits)
 # ============================================================
 print("\nHooks:")
 hooks_src = REPO / "claude-hooks.sh"
 hooks_dst = HOME / "bin" / "claude-hooks.sh"
 if hooks_src.exists():
-    sync_file(hooks_src, hooks_dst, "hooks/claude-hooks.sh", "always_update")
+    sync_file(hooks_src, hooks_dst, "hooks/claude-hooks.sh", "smart_merge")
     if hooks_dst.exists():
         hooks_dst.chmod(0o755)
 
@@ -240,7 +243,140 @@ if stats["protected"] > 0:
 SYNC_SCRIPT
 ```
 
-### Step 3: Run security patch on all installed skills
+### Step 3: Merge CLAUDE.md sections from other machines
+This step handles TWO merges:
+- **3a**: Full `##` section merge from other machines' global CLAUDE.md
+- **3b**: Insights-tagged section merge (finer-grained)
+
+#### Step 3a: Merge missing CLAUDE.md sections from other machines
+```bash
+python3 << 'CLAUDEMD_MERGE'
+import re, socket
+from pathlib import Path
+
+HOME = Path.home()
+REPO_CMD = Path("/tmp/antifragile-pull/assets/claude-md")
+
+raw_host = socket.gethostname()
+short_host = raw_host.replace("Sumits-", "").replace(".local", "").replace(" ", "-")
+
+if not REPO_CMD.exists():
+    print("  No claude-md directory in repo — skipping")
+else:
+    local_global = HOME / ".claude" / "CLAUDE.md"
+    if not local_global.exists():
+        print("  No local ~/.claude/CLAUDE.md — skipping section merge")
+    else:
+        local_content = local_global.read_text(encoding="utf-8")
+        total_merged = 0
+
+        for md_file in sorted(REPO_CMD.glob("*-global.md")):
+            source_machine = md_file.stem.replace("-global", "")
+
+            # Skip our own file
+            if source_machine == short_host:
+                continue
+
+            remote_content = md_file.read_text(encoding="utf-8")
+
+            # Extract all ## level sections (top-level sections)
+            # Pattern: ## heading line + everything until next ## or end
+            pattern = r'(^## [^\n]+\n(?:(?!^## ).*\n?)*)'
+            remote_sections = re.findall(pattern, remote_content, re.MULTILINE)
+
+            new_to_add = []
+            for section in remote_sections:
+                section = section.strip()
+                header = section.split("\n")[0].strip()
+                # Only merge if this exact header doesn't exist locally
+                if header not in local_content:
+                    new_to_add.append(section)
+
+            if new_to_add:
+                with open(local_global, "a", encoding="utf-8") as f:
+                    f.write(f"\n\n## — Merged from {source_machine} via /sync-pull —\n")
+                    for s in new_to_add:
+                        f.write("\n" + s + "\n")
+                total_merged += len(new_to_add)
+                # Re-read to prevent duplicates across multiple source files
+                local_content = local_global.read_text(encoding="utf-8")
+                print(f"  + {len(new_to_add)} section(s) from {source_machine} → global CLAUDE.md")
+
+        if total_merged == 0:
+            print("  All CLAUDE.md sections already present locally")
+        else:
+            print(f"\n  Total: {total_merged} section(s) merged into ~/.claude/CLAUDE.md")
+CLAUDEMD_MERGE
+```
+
+#### Step 3b: Merge Insights sections from other machines into local CLAUDE.md
+```bash
+python3 << 'INSIGHTS_MERGE'
+import re, socket
+from pathlib import Path
+
+HOME = Path.home()
+REPO_INSIGHTS = Path("/tmp/antifragile-pull/assets/insights")
+
+# Short hostname — skip our own insights file
+raw_host = socket.gethostname()
+short_host = raw_host.replace("Sumits-", "").replace(".local", "").replace(" ", "-")
+
+if not REPO_INSIGHTS.exists():
+    print("  No insights directory in repo — skipping")
+else:
+    # Collect all CLAUDE.md files to merge into
+    claude_targets = []
+    global_cmd = HOME / ".claude" / "CLAUDE.md"
+    project_cmd = HOME / "CLAUDE.md"
+    if project_cmd.exists():
+        claude_targets.append(("project", project_cmd))
+    elif global_cmd.exists():
+        claude_targets.append(("global", global_cmd))
+
+    if not claude_targets:
+        print("  No CLAUDE.md found locally — skipping insights merge")
+    else:
+        total_merged = 0
+        # Read insights from ALL machines (including our own — dedup handles it)
+        for insights_file in sorted(REPO_INSIGHTS.glob("*.md")):
+            source_machine = insights_file.stem
+            content = insights_file.read_text(encoding="utf-8")
+
+            # Extract individual sections (### or ## with Insights tag)
+            pattern = r'(#{2,3}\s+[^\n]*\(Insights[^\)]*\)[^\n]*\n(?:(?!#{2,3}\s).*\n?)*)'
+            sections = re.findall(pattern, content)
+
+            if not sections:
+                continue
+
+            for label, target_path in claude_targets:
+                target_content = target_path.read_text(encoding="utf-8")
+
+                new_to_add = []
+                for section in sections:
+                    section = section.strip()
+                    header_line = section.split("\n")[0].strip()
+                    # Check if this exact header already exists in our CLAUDE.md
+                    if header_line not in target_content:
+                        new_to_add.append(section)
+
+                if new_to_add:
+                    with open(target_path, "a", encoding="utf-8") as f:
+                        f.write(f"\n\n## Insights from {source_machine} (auto-merged via /sync-pull)\n")
+                        for s in new_to_add:
+                            f.write("\n" + s + "\n")
+                    total_merged += len(new_to_add)
+                    print(f"  + {len(new_to_add)} section(s) from {source_machine} → {label} CLAUDE.md")
+
+        if total_merged == 0:
+            print("  All insights already present locally — nothing to merge")
+        else:
+            print(f"\n  Total: {total_merged} Insights section(s) merged into local CLAUDE.md")
+INSIGHTS_MERGE
+```
+
+### Step 4: Run security patch on all installed skills
 ```bash
 if [ -f /tmp/antifragile-pull/assets/scripts/security-patch.sh ]; then
   echo ""
@@ -248,7 +384,7 @@ if [ -f /tmp/antifragile-pull/assets/scripts/security-patch.sh ]; then
 fi
 ```
 
-### Step 4: Install/update the skill security scanner
+### Step 5: Install/update the skill security scanner
 ```bash
 mkdir -p ~/.claude/scripts
 if [ -f /tmp/antifragile-pull/assets/scripts/skill-security-scan.sh ]; then
@@ -258,9 +394,32 @@ if [ -f /tmp/antifragile-pull/assets/scripts/skill-security-scan.sh ]; then
 fi
 ```
 
-### Step 5: Verify counts
+### Step 6: Show machine registry
 ```bash
 echo ""
+echo "=== Machine Registry ==="
+if [ -d /tmp/antifragile-pull/assets/machines ]; then
+  for mf in /tmp/antifragile-pull/assets/machines/*.json; do
+    if [ -f "$mf" ]; then
+      NAME=$(python3 -c "import json; d=json.load(open('$mf')); print(d.get('short_name','?'))")
+      LAST=$(python3 -c "import json; d=json.load(open('$mf')); print(d.get('last_push','?'))")
+      OS=$(python3 -c "import json; d=json.load(open('$mf')); print(d.get('os','?'))")
+      echo "  Machine: $NAME | Last push: $LAST | OS: $OS"
+    fi
+  done
+else
+  echo "  No machine signatures found in repo yet"
+fi
+echo ""
+
+# Show git log with machine tags (last 5 syncs)
+echo "=== Recent Sync History ==="
+cd /tmp/antifragile-pull && git log --oneline -5 --format="  %h %s" 2>/dev/null
+echo ""
+```
+
+### Step 7: Verify counts
+```bash
 echo "Installed counts:"
 echo "  Skills:   $(find ~/.claude/skills -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
 echo "  Agents:   $(find ~/.claude/agents -type f 2>/dev/null | wc -l | tr -d ' ')"
@@ -268,7 +427,7 @@ echo "  Commands: $(find ~/.claude/commands -type f 2>/dev/null | wc -l | tr -d 
 echo "  Rules:    $(find ~/.claude/rules -type f 2>/dev/null | wc -l | tr -d ' ')"
 ```
 
-### Step 6: Clean up
+### Step 8: Clean up
 ```bash
 rm -rf /tmp/antifragile-pull
 ```
