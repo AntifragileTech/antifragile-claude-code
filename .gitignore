@@ -1,0 +1,15 @@
+.DS_Store
+*.swp
+*.swo
+*~
+.env
+
+# Cache and transcript data — never commit
+.cache/
+**/.cache/
+*.transcript.json
+
+# Personal/machine-specific files
+NOTES.md
+handoff.md
+.sync-manifest.json

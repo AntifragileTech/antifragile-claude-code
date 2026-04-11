@@ -1,0 +1,321 @@
+# Claude Code Global Instructions
+
+## Project Architecture
+<!-- Customize: describe your project structure -->
+<!-- Example: This is a multi-app monorepo. When fixing bugs, always check for the same pattern across ALL apps. -->
+
+## Authentication & OAuth
+Before starting any observer/memory agent session, verify OAuth token validity first. If token is expired, refresh it immediately before proceeding. Do not attempt repeated API calls with an expired token - fail fast and notify the user.
+
+## Media & Screenshots
+When taking screenshots or generating images, always use the project's existing screenshot/image generation framework rather than raw browser captures. Never expose personal browser data, bookmarks, or chrome in screenshots.
+
+## Build Verification
+After modifying any frontend component, always run the full build command. Verify zero TypeScript errors before considering the task complete.
+- Check `package.json` for the exact package name before running any filter command.
+- Never end a session without verifying the build passes for all affected apps.
+
+## Health Checks & Database Queries
+When querying the database, ALWAYS check actual column names first before writing queries. Never assume column names — always verify schema first.
+
+## Plan Mode Rules
+- Do NOT get stuck in plan mode loops. If plan mode is not productive after one cycle, proceed directly to implementation.
+- Never spend more than 2-3 minutes in pure discovery/planning without writing code. Bias toward action.
+- When asked to fix a bug or make a change, start coding within the first 2 tool calls after initial file reads.
+
+## Code Modification Rules
+When running bulk find-and-replace or scripted refactors, always verify JSX/TSX usage patterns in addition to import statements. Run TypeScript checks immediately after bulk operations before considering them complete.
+
+## Documentation & Config Update Rule (CRITICAL)
+When updating CLAUDE.md, memory files, documentation, or configuration: ALWAYS ADD or UPDATE — NEVER overwrite or delete existing content unless explicitly asked. Append new rules, merge new context into existing sections, and preserve all prior decisions and learnings.
+
+## CLAUDE.md Auto-Suggest Rule
+During any session, if you discover permanent project knowledge — architecture decisions, gotchas, environment quirks, naming conventions, deployment requirements, or anything a future session would need to know — proactively suggest appending it to the project's CLAUDE.md.
+- Say: "This looks like permanent project knowledge. Should I add it to CLAUDE.md?"
+- Only suggest for durable facts, not session-level progress
+- Examples that belong in CLAUDE.md: port numbers, schema paths, deploy commands, framework quirks, naming conventions, API patterns, known workarounds
+- Examples that do NOT belong: "fixed bug today", "3 files uncommitted", "user wants X done next"
+- When adding, append to the most relevant existing section — or create a new section if none fits
+- NEVER auto-write to CLAUDE.md without asking first
+
+## Code Edit Hygiene
+- After applying multi-step edits to a file, re-read the file to verify no duplicate code blocks, unclosed tags, or orphaned fragments were introduced.
+- When using React createPortal or SSR guards, always verify the component renders correctly on both server and client.
+- After editing TSX/JSX files, do a quick scan for unclosed tags before moving on.
+
+## React/Next.js Patterns
+- When fixing z-index/stacking context issues, prefer React `createPortal` to document.body rather than z-index wars.
+- For Vercel OG / Satori image generation, every parent div with multiple children MUST have `display: 'flex'` explicitly set.
+- Do not use Tailwind plugin classes without verifying the plugin is installed.
+
+## Cross-App Impact Check (BEFORE fixing)
+Before fixing ANY bug in a monorepo, FIRST grep for the same pattern across ALL apps. Show every instance. Then fix them all together in one pass. Do NOT fix one app and move on — the same bug almost always exists in multiple places.
+
+## Approach Strategy
+- When fixing UI bugs, consider React createPortal early for z-index/stacking context issues.
+- For networking issues in Docker, always think container-to-container networking first, not localhost.
+- If your first approach doesn't work after 2 attempts, stop and try a fundamentally different approach.
+- Prefer direct implementation over extensive planning. Write code first, refine later.
+
+## Git Commit Discipline
+- Commit early and often. Do NOT let 10+ files accumulate uncommitted. After completing each logical unit of work (bug fix, feature, refactor), suggest a commit.
+- If a session produces code changes across 5+ files, always remind the user to commit before ending the session.
+- Uncommitted work is lost work — treat git commits as checkpoints, not just milestones.
+
+## Self-Verification Rule
+Before presenting code changes to the user, always verify your own output:
+- Re-read edited files to catch duplicate code blocks, syntax errors, or orphaned fragments.
+- Run the project's type checker or linter after edits.
+- For UI changes, mentally trace the component tree to catch missing imports, unclosed tags, or broken props.
+- Do NOT present code that you haven't verified compiles. If you can't verify, say so explicitly.
+
+## Multi-Bug Session Protocol
+When a session involves fixing 3+ bugs or issues:
+1. FIRST: Create a TodoWrite checklist of ALL issues before making any code changes.
+2. Work through each issue one at a time — fix, verify, mark complete.
+3. Do NOT start the next bug until the current one is verified working.
+4. After all todos are done, run a final build/test pass to verify nothing regressed.
+
+## Session Handoff
+After every significant milestone or session, create a structured handoff document with: current status, what was completed, what remains, environment state, and any gotchas. Save to persistent memory files.
+
+## Session Discipline
+- Keep sessions focused on 1-2 related tasks for highest completion rate.
+- Do not spend entire sessions on discovery/exploration without producing code output.
+- If asked for "comprehensive" audits, produce actionable findings with specific code changes, not just lists of observations.
+- Do NOT use observer/memory agent sessions unless OAuth tokens are verified valid. Use `/checkpoint` at the end of a session instead.
+- When batching multiple bug fixes, complete and verify each one before moving to the next.
+
+## UI Notification Rule (ALL PROJECTS)
+- **NEVER use browser notifications** — no `window.alert()`, `window.confirm()`, `window.prompt()`, and no browser Notification API.
+- All user-facing notifications MUST be **in-app UI components**: toast notifications, inline banners, modal dialogs, or status messages.
+- For delete confirmations, use a custom modal component (not `window.confirm`).
+
+## Email & Notifications
+<!-- Customize: add your verified sender address -->
+When sending emails via SendGrid or other providers, always use the verified sender address. Never use generic/placeholder sender emails. Always route through the app's email service so sends appear in admin logs.
+
+## Deployment & Docker
+For Docker deployments: always fix file ownership/permissions BEFORE container start using host-level volume operations, not after via docker exec.
+
+## Task Completion Standards
+When asked to 'test', 'fix', or 'implement' something, always carry through to EXECUTION and VERIFICATION — not just discovery/planning. If running out of context, summarize exactly what's left to do with specific file paths and code snippets for the next session.
+
+## Pre-Deploy Checklist
+Before deploying, always run through:
+1. Check all new/changed field names are consistent across frontend, backend, and database schema
+2. Test all regex patterns against existing patterns to avoid collisions
+3. Verify variable scoping — especially when extracting logic across functions
+4. For auth flows: test the full signup AND login path end-to-end
+5. Run TypeScript checks and fix all errors before deployment
+6. **ALWAYS give full deploy commands** with `cd` to the project directory
+
+## Session Start Rules
+- If memory/documentation files exist, read them at session start to restore context.
+- Check for uncommitted changes and current git branch state before making new edits.
+
+## cPanel / Shared Hosting Zip Deployment
+- **NEVER use the macOS `zip` command** — it embeds metadata that causes 403 errors on shared servers.
+- **ALWAYS use Python `zipfile` module** with explicit permissions and current timestamps.
+- **Always zip from INSIDE** the source directory, never from the parent.
+- **Delete zip files** from the web root after extraction.
+
+## Agent Patterns
+
+### Observer/Memory Agent Pattern
+Do NOT spawn observer or memory agent sessions unless the OAuth token has been verified as valid within the last 5 minutes. If an observer session encounters an auth error on its first call, immediately terminate rather than retrying dozens of times.
+
+## Sub-Agent / Parallel Task Rules
+- Each sub-agent has a LIMITED context window — smaller than the main session.
+- NEVER ask a sub-agent to generate more than 200 lines of code in a single task.
+- Before launching parallel agents, break the work so each agent's task is small and self-contained.
+
+## Session File Hygiene (CRITICAL)
+- Always include a **created date** and **status line** on session files.
+- Mark completed files as archived — do NOT leave them as active.
+- The **single source of truth** for current state is `~/.claude/logs/handoff.md` and memory files, NOT random files in project directories.
+
+## Assumption Surfacing (CRITICAL)
+Before implementing anything non-trivial — especially commands involving production databases, Docker containers, file paths, or environment-specific configs — explicitly state assumptions first:
+ASSUMPTIONS I'M MAKING:
+1. [assumption about path/env/config]
+2. [assumption about behavior/requirement]
+→ Correct me now or I'll proceed with these.
+- Never silently fill in ambiguous requirements. Surface uncertainty early.
+- If a file path, container name, DB credential, or schema location isn't 100% confirmed, ASK — don't guess.
+- This applies especially to: schema paths, Docker container names, production DB user/database, deploy script locations, and domain/URL references.
+
+## Confusion Management
+When encountering inconsistencies, conflicting patterns, or unclear specifications:
+1. STOP. Do not proceed with a guess.
+2. Name the specific confusion: "I see X in file A but Y in file B."
+3. Present the tradeoff or ask the clarifying question.
+4. Wait for resolution before continuing.
+- In a monorepo with multiple apps, conflicting patterns across apps must be flagged, not silently resolved by picking one.
+- If a requirement contradicts an existing CLAUDE.md rule, surface the conflict explicitly.
+
+## Anti-Sycophancy Rule
+Do not be a yes-machine. When the user's approach has clear problems:
+- Point out the issue directly with the concrete downside.
+- Propose an alternative.
+- Accept their decision if they override — but the pushback must happen first.
+- "Of course!" followed by implementing a bad idea helps no one.
+- This applies especially to: designs that ignore platform context, deploying without testing, skipping type checks, or approaches that have already failed.
+
+## Token Optimization (CRITICAL)
+Token consumption is the #1 operational cost. Follow these rules to minimize waste without sacrificing quality:
+
+### Context Hygiene
+- Use `/clear` between unrelated tasks. Stale context wastes tokens on every subsequent message.
+- Use `/context` periodically to see what's consuming context space — MCP tools, files, conversation history.
+- Use `/rename` before clearing so sessions are findable via `/resume` later.
+- Disable unused MCP servers via `/mcp` — each adds tool definitions to context even when unused.
+- Prefer CLI tools (`gh`, `aws`, `docker`) over MCP equivalents when available — zero per-tool context overhead.
+
+### Prompt Discipline
+- Be specific: "fix the auth middleware in src/auth.ts line 45" not "fix the auth issue."
+- Vague prompts like "improve this codebase" trigger broad file scanning that burns tokens.
+- Include file paths and line numbers when you know them — reduces Claude's search cost.
+- Give verification targets: test cases, expected output, or screenshots so Claude self-verifies instead of asking.
+
+### Model Routing
+- Use Sonnet for 90% of coding tasks. Reserve Opus for complex architecture or multi-step reasoning.
+- Use Haiku for research subagents, documentation, and simple tasks — 3x cheaper than Sonnet.
+- Switch models mid-session with `/model` — no need to restart.
+- For subagents, specify `model: haiku` when the task is simple (search, lint, format).
+
+### Context Preservation
+- Use plan mode (Shift+Tab) for complex tasks — Claude explores and proposes before implementing, preventing expensive re-work.
+- Course-correct early: press Escape to stop immediately if Claude heads the wrong direction. Use `/rewind` to restore.
+- Test incrementally: write one file, test it, then continue. Catches issues when they're cheap to fix.
+- Keep feature branches small — limits scope creep and context bloat.
+
+### Delegate Verbose Work
+- Delegate test runs, log analysis, and documentation to subagents — verbose output stays in the subagent's window, only a summary returns.
+- Use hooks to preprocess data before Claude sees it. Example: filter test output to show only failures instead of full test logs.
+- Use Python scripts for bulk operations — they don't consume AI context at all.
+
+### Extended Thinking Budget
+- Default thinking budget is 31,999 tokens per request — this is expensive.
+- For simple tasks, lower it: `export MAX_THINKING_TOKENS=8000` or use `/effort` to reduce effort level.
+- Toggle thinking with Option+T (macOS) / Alt+T (Windows/Linux).
+- Only use full thinking budget for architectural decisions, complex debugging, or multi-file refactors.
+
+# Compact Instructions
+
+When compacting, preserve:
+- All code changes and file paths modified in this session
+- Test output (pass/fail status, not full logs)
+- Current task state and remaining work
+- Key decisions made and their rationale
+- Error messages that informed debugging direction
+
+When compacting, discard:
+- File contents that were read but not modified
+- Exploratory searches that led to dead ends
+- Verbose command output already summarized
+- Repeated tool calls with identical results
+
+## Auto-Context Management (AUTOMATED)
+Context is automatically monitored by hooks. The system will:
+- At 500KB (~50% full): Suggest finishing current task and running /save
+- At 1MB (~75% full): Urgently recommend /save
+- At 1.5MB (~90% full): Warn that auto-compact is imminent
+- Every 15 messages: Remind to /save if task has switched
+- On Stop: Auto-check for uncommitted files and context bloat
+
+When Claude detects a natural task boundary (bug fixed, feature complete, question answered):
+1. Proactively suggest: "Task complete. Run /save to save context and reset."
+2. Do NOT wait for the user to remember — suggest it immediately after task completion.
+3. /save handles: git commit, memory save, handoff doc, then prompts for /clear.
+
+### Effort Auto-Routing
+- Simple tasks (typos, single-file edits, questions): use /effort low
+- Standard tasks (bug fixes, features, reviews): use /effort medium
+- Complex tasks (architecture, multi-file refactors, debugging): use /effort high
+- Claude should suggest the appropriate effort level at task start, not wait to be asked.
+
+## File Creation Timestamp (CRITICAL — ALL FILES)
+Every file created via Write tool MUST include a creation timestamp comment as the FIRST line (or after shebang/frontmatter). Format by file type:
+- **JS/TS/TSX/JSX/Java/C/C++/Go/Rust/Swift/Kotlin**: `// Created: HH:MM DD-MMM-YYYY`
+- **Python/Ruby/Shell/YAML/TOML**: `# Created: HH:MM DD-MMM-YYYY`
+- **HTML/XML/SVG**: `<!-- Created: HH:MM DD-MMM-YYYY -->`
+- **CSS/SCSS/LESS**: `/* Created: HH:MM DD-MMM-YYYY */`
+- **Markdown**: `<!-- Created: HH:MM DD-MMM-YYYY -->`  (first line, before any content)
+- **SQL**: `-- Created: HH:MM DD-MMM-YYYY`
+- **JSON**: Skip (JSON doesn't support comments) — instead add `"_created"` key if it's a config file
+- Get the exact time by running `date '+%H:%M %d-%b-%Y'` ONCE at the start of each session and reuse that timestamp for all files created in that response.
+- This applies to NEW files only — never add timestamps when editing existing files.
+- Exception: generated files (build output, lockfiles, node_modules) are excluded.
+
+## Response Timestamps (ALL RESPONSES — NO EXCEPTIONS)
+- At the **start** of EVERY response, run `date '+%H:%M:%S %d-%b-%Y'` and print: `⏱ Started: HH:MM:SS DD-MMM-YYYY`
+- At the **end** of EVERY response, run `date '+%H:%M:%S %d-%b-%Y'` and print: `⏱ Completed: HH:MM:SS DD-MMM-YYYY (took XmYs)` — calculate the duration from the start timestamp.
+- Duration format: if under 60s → `(took 45s)`, if 1-59 min → `(took 3m22s)`, if 1h+ → `(took 1h12m)`
+- This applies to ALL responses — short answers, conversational replies, task responses, everything. No exceptions.
+- This gives the user visibility into how long every interaction takes.
+
+## Agent Swarm Monitoring (CRITICAL)
+When launching **3 or more parallel agents**:
+1. After launching all agents, immediately set a **60-second check timer** using `sleep 60`.
+2. After 60 seconds, check each agent's status:
+   - Read each agent's output file via `tail -20`
+   - Report: which agents completed, which are still running, which appear stuck
+3. If any agent has no output after 60s, report it immediately — do NOT wait longer.
+4. Repeat the 60-second check cycle until all agents complete or are confirmed stuck.
+5. For 10+ agents, use **90-second** intervals. For 15+ agents, use **120-second** intervals.
+6. Always report progress: "5/12 agents complete, 6 running, 1 stuck (agent-name)"
+
+## Project Notes File (CRITICAL — EVERY SAVE/HANDOFF)
+On every `/save`, `/handoff`, or session end:
+1. Append to `NOTES.md` in the project root (create if doesn't exist).
+2. **NEVER overwrite** — always append a new entry at the bottom.
+3. Format for each entry:
+   ```
+   ---
+   ## Session: HH:MM DD-MMM-YYYY
+
+   ### What was done
+   - [bullet list of concrete changes made]
+
+   ### What was learned
+   - [gotchas discovered, decisions made, patterns found]
+
+   ### Key files modified
+   - [list of files changed with brief description]
+
+   ### Handoff context
+   - [what the next session needs to know]
+   ```
+4. This creates a permanent, append-only project history that survives memory overwrites.
+5. When transferring a project to someone, `NOTES.md` gives them the full development story.
+6. Also append a short entry (2-3 lines) to `~/.claude/logs/NOTES.md` — the **global** cross-project activity log. Format: `## HH:MM DD-MMM-YYYY — PROJECT_NAME (directory)` followed by bullet summary. This answers "what did I do across all projects this week/month?"
+
+## No Personal Data in Shared Repos (CRITICAL)
+When pushing to ANY shared/public repo (especially antifragile-claude-code), NEVER include:
+- **Real usernames or full paths**: `/Users/sumitghugharwal/...` → use `/Users/username/...` or `~`
+- **Real email addresses**: `monitor@novauptime.com` → use `monitor@yourdomain.com` or `user@example.com`
+- **Project/client names**: `LMSGUM`, `wareone` → use `MyApp`, `MyProject`
+- **Personal folder names**: `Vibe Code` → use `Projects` or `Code`
+- **API keys, tokens, credentials**: even examples must use `$ENV_VAR` format
+- **Cache files, transcripts, scraped data**: add `.cache/` to `.gitignore`
+- **Domain names**: `novauptime.com`, `ghugharwal-uptime` → use `yourdomain.com`
+
+Before every `/sync-push`, scan for personal data patterns. If found, replace with generic equivalents before pushing.
+
+## Session Continuation Prompt (AUTO-GENERATE)
+On every `/save` or `/handoff`, automatically generate a **copy-paste-ready continuation prompt** and print it to the user. Format:
+```
+╔══════════════════════════════════════════════════════╗
+║  CONTINUATION PROMPT — copy-paste into next session  ║
+╠══════════════════════════════════════════════════════╣
+
+Continue work on [PROJECT_NAME] in [DIRECTORY].
+Last session (DD-MMM-YYYY): [1-2 sentence summary of what was done].
+Remaining work: [specific next steps].
+Read NOTES.md and the project handoff at ~/.claude/projects/[project-key]/memory/handoff.md for full context.
+
+╚══════════════════════════════════════════════════════╝
+```
+- The user should be able to copy this block and paste it into a new session to resume instantly.
+- Do NOT ask "should I generate a continuation prompt?" — always generate it automatically.

@@ -1,0 +1,68 @@
+#!/bin/bash
+# Pre-push preflight: verify git user.name matches the remote owner
+# Prevents accidental pushes to wrong GitHub account
+#
+# CUSTOMIZE: Edit the ACCOUNT_MAP below with your directory patterns and accounts
+# Format: "directory-pattern:expected-github-username"
+
+ACCOUNT_MAP=(
+  # Add your mappings here. Example:
+  # "client-project:client-github-account"
+  # "personal-project:your-github-account"
+)
+
+# Default account (used when no pattern matches)
+DEFAULT_ACCOUNT=""  # Set to your primary GitHub username
+
+REMOTE_URL=$(git config --get remote.origin.url 2>/dev/null)
+CURRENT_USER=$(git config --get user.name 2>/dev/null)
+CURRENT_DIR=$(pwd)
+
+# Extract GitHub org/user from remote URL
+if echo "$REMOTE_URL" | grep -q "github.com"; then
+  REMOTE_OWNER=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/]([^/]+)/.*|\1|')
+else
+  exit 0  # Not a GitHub remote, skip check
+fi
+
+# Find expected account from ACCOUNT_MAP
+EXPECTED_USER="$DEFAULT_ACCOUNT"
+for mapping in "${ACCOUNT_MAP[@]}"; do
+  PATTERN="${mapping%%:*}"
+  ACCOUNT="${mapping##*:}"
+  if echo "$CURRENT_DIR" | grep -qi "$PATTERN"; then
+    EXPECTED_USER="$ACCOUNT"
+    break
+  fi
+done
+
+# Skip check if no mapping configured
+[ -z "$EXPECTED_USER" ] && exit 0
+
+# Verify remote owner matches expected account
+if [ "$REMOTE_OWNER" != "$EXPECTED_USER" ] && \
+   [ "$(echo "$REMOTE_OWNER" | tr '[:upper:]' '[:lower:]')" != "$(echo "$EXPECTED_USER" | tr '[:upper:]' '[:lower:]')" ]; then
+  echo ""
+  echo "  GIT ACCOUNT MISMATCH DETECTED"
+  echo "   Directory:    $CURRENT_DIR"
+  echo "   Remote owner: $REMOTE_OWNER"
+  echo "   Expected:     $EXPECTED_USER"
+  echo "   Git user:     $CURRENT_USER"
+  echo ""
+  echo "   To proceed anyway: git push --no-verify"
+  echo ""
+  exit 1
+fi
+
+# Verify git user.name matches remote owner
+if [ "$CURRENT_USER" != "$REMOTE_OWNER" ] && \
+   [ "$(echo "$CURRENT_USER" | tr '[:upper:]' '[:lower:]')" != "$(echo "$REMOTE_OWNER" | tr '[:upper:]' '[:lower:]')" ]; then
+  echo ""
+  echo "  GIT USER MISMATCH"
+  echo "   user.name: '$CURRENT_USER' but pushing to '$REMOTE_OWNER'"
+  echo "   Run: gh auth switch --user $REMOTE_OWNER"
+  echo ""
+  exit 1
+fi
+
+exit 0

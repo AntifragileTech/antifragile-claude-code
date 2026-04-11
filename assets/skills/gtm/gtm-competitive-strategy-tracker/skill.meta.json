@@ -1,0 +1,15 @@
+{
+  "slug": "gtm-competitive-strategy-tracker",
+  "category": "composites",
+  "tags": [
+    "competitive-intel"
+  ],
+  "installation": {
+    "base_command": "npx goose-skills install competitive-strategy-tracker",
+    "supports": [
+      "claude",
+      "cursor",
+      "codex"
+    ]
+  }
+}

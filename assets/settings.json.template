@@ -1,0 +1,128 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80"
+  },
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "WebFetch"
+    ],
+    "defaultMode": "default"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/bin/claude-hooks.sh session-start",
+            "timeout": 5,
+            "statusMessage": "Starting session..."
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/bin/claude-hooks.sh session-end",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/bin/claude-hooks.sh check-prompt",
+            "timeout": 5,
+            "statusMessage": "Checking session size..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/bin/claude-hooks.sh pre-bash",
+            "timeout": 5,
+            "statusMessage": "Safety check..."
+          },
+          {
+            "type": "command",
+            "command": "$HOME/bin/claude-hooks.sh pre-bash-build",
+            "timeout": 120,
+            "statusMessage": "Verifying build before commit..."
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/bin/claude-hooks.sh pre-write",
+            "timeout": 5,
+            "statusMessage": "Checking file size..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/bin/claude-hooks.sh post-ts",
+            "timeout": 30,
+            "statusMessage": "Type-checking TypeScript..."
+          },
+          {
+            "type": "command",
+            "command": "$HOME/bin/claude-hooks.sh post-lint",
+            "timeout": 30,
+            "statusMessage": "Linting..."
+          },
+          {
+            "type": "command",
+            "command": "$HOME/bin/claude-hooks.sh post-prisma",
+            "timeout": 15,
+            "statusMessage": "Validating Prisma schema..."
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/scripts/skill-security-scan.sh \"$(echo $TOOL_INPUT | jq -r '.file_path // .filePath // empty')\"",
+            "timeout": 10,
+            "statusMessage": "Scanning skill for security issues..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/bin/claude-hooks.sh check-stop",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "outputStyle": "concise",
+  "alwaysThinkingEnabled": true,
+  "autoMemoryEnabled": true
+}
