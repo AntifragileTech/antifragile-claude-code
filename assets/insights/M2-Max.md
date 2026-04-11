@@ -37,3 +37,11 @@
 - For Python batch scripts generating multilingual content, always open files with `encoding='utf-8'` explicitly.
 - If a batch script produces ASCII-escaped characters instead of proper UTF-8, stop and fix the script before running it on all files — do not generate broken output then fix it in a second pass.
 
+## Response Timestamps (ALL RESPONSES — NO EXCEPTIONS) (Insights 2026-04-11 M2-Max)
+- At the **start** of EVERY response, run `date '+%H:%M:%S %d-%b-%Y'` and print: `⏱ Started: HH:MM:SS DD-MMM-YYYY`
+- At the **end** of EVERY response, run `date '+%H:%M:%S %d-%b-%Y'` AND `$HOME/bin/context-status.sh`, then print: `⏱ Completed: HH:MM:SS DD-MMM-YYYY (took XmYs) | ctx: ~120K/1M (12%)` — calculate the duration from the start timestamp, and append the context-status output.
+- Duration format: if under 60s → `(took 45s)`, if 1-59 min → `(took 3m22s)`, if 1h+ → `(took 1h12m)`
+- Context format: append ` | ctx: ` followed by the output of `$HOME/bin/context-status.sh` (e.g., `~120K/1M (12%)`)
+- This applies to ALL responses — short answers, conversational replies, task responses, everything. No exceptions.
+- This gives the user visibility into how long every interaction takes and how much context is consumed.
+

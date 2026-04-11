@@ -103,7 +103,7 @@ Every file created via Write tool MUST include a creation timestamp comment as t
 - This applies to NEW files only — never add timestamps when editing existing files.
 - Exception: generated files (build output, lockfiles, node_modules) are excluded.
 
-## Response Timestamps (ALL RESPONSES — NO EXCEPTIONS)
+## Response Timestamps (ALL RESPONSES — NO EXCEPTIONS) (Insights 2026-04-11 M2-Max)
 - At the **start** of EVERY response, run `date '+%H:%M:%S %d-%b-%Y'` and print: `⏱ Started: HH:MM:SS DD-MMM-YYYY`
 - At the **end** of EVERY response, run `date '+%H:%M:%S %d-%b-%Y'` AND `$HOME/bin/context-status.sh`, then print: `⏱ Completed: HH:MM:SS DD-MMM-YYYY (took XmYs) | ctx: ~120K/1M (12%)` — calculate the duration from the start timestamp, and append the context-status output.
 - Duration format: if under 60s → `(took 45s)`, if 1-59 min → `(took 3m22s)`, if 1h+ → `(took 1h12m)`
