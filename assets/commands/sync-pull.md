@@ -207,6 +207,20 @@ if hooks_src.exists():
         hooks_dst.chmod(0o755)
 
 # ============================================================
+# SYNC: Bin scripts (SMART MERGE — protect local edits)
+# ============================================================
+print("\nBin scripts:")
+bin_src = REPO / "bin"
+bin_dst = HOME / "bin"
+if bin_src.exists():
+    for f in sorted(bin_src.iterdir()):
+        if f.is_file():
+            dst = bin_dst / f.name
+            sync_file(f, dst, f"bin/{f.name}", "smart_merge")
+            if dst.exists():
+                dst.chmod(0o755)
+
+# ============================================================
 # Templates — report only, never auto-apply
 # ============================================================
 print("\nTemplates:")
