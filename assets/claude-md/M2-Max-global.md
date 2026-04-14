@@ -90,18 +90,61 @@ You have 567+ installed skills (including gstack), 93+ commands, and 68+ agents.
 - For image processing: use OpenCV for detection + Pillow (PIL) for high-quality crops/resizes.
 - For HTML manipulation: use regex or string matching — no need for heavy parsers on static HTML.
 
-## File Creation Timestamp (CRITICAL — ALL FILES)
-Every file created via Write tool MUST include a creation timestamp comment as the FIRST line (or after shebang/frontmatter). Format by file type:
-- **JS/TS/TSX/JSX/Java/C/C++/Go/Rust/Swift/Kotlin**: `// Created: HH:MM DD-MMM-YYYY`
-- **Python/Ruby/Shell/YAML/TOML**: `# Created: HH:MM DD-MMM-YYYY`
-- **HTML/XML/SVG**: `<!-- Created: HH:MM DD-MMM-YYYY -->`
-- **CSS/SCSS/LESS**: `/* Created: HH:MM DD-MMM-YYYY */`
-- **Markdown**: `<!-- Created: HH:MM DD-MMM-YYYY -->`  (first line, before any content)
-- **SQL**: `-- Created: HH:MM DD-MMM-YYYY`
-- **JSON**: Skip (JSON doesn't support comments) — instead add `"_created"` key if it's a config file
-- Get the exact time by running `date '+%H:%M %d-%b-%Y'` ONCE at the start of each session and reuse that timestamp for all files created in that response.
-- This applies to NEW files only — never add timestamps when editing existing files.
-- Exception: generated files (build output, lockfiles, node_modules) are excluded.
+## File Lifecycle Timestamps (CRITICAL — ALL FILES)
+Every file created or updated by Claude MUST have lifecycle timestamps. This creates an append-only audit trail per file. Human-readable format: `HH:MM DD-MMM-YYYY` (e.g., `05:14 14-Apr-2026`).
+
+### Comment Format by File Type
+- **JS/TS/TSX/JSX/Java/C/C++/Go/Rust/Swift/Kotlin**: `// Created: HH:MM DD-MMM-YYYY` / `// Updated: HH:MM DD-MMM-YYYY`
+- **Python/Ruby/Shell/YAML/TOML**: `# Created: HH:MM DD-MMM-YYYY` / `# Updated: HH:MM DD-MMM-YYYY`
+- **HTML/XML/SVG**: `<!-- Created: HH:MM DD-MMM-YYYY -->` / `<!-- Updated: HH:MM DD-MMM-YYYY -->`
+- **CSS/SCSS/LESS**: `/* Created: HH:MM DD-MMM-YYYY */` / `/* Updated: HH:MM DD-MMM-YYYY */`
+- **Markdown**: `<!-- Created: HH:MM DD-MMM-YYYY -->` / `<!-- Updated: HH:MM DD-MMM-YYYY -->`
+- **SQL**: `-- Created: HH:MM DD-MMM-YYYY` / `-- Updated: HH:MM DD-MMM-YYYY`
+- **JSON** (config files only): `"_created": "HH:MM DD-MMM-YYYY"` / `"_updated": ["HH:MM DD-MMM-YYYY", ...]` (array, append-only)
+- **Plain text / .txt / .env / .cfg / Dockerfile**: `# Created: HH:MM DD-MMM-YYYY` / `# Updated: HH:MM DD-MMM-YYYY`
+- **Images (png/jpg/svg/gif/webp)**: Embed timestamp in filename: `name_HHMMSS-DDMMMYYYY.ext` (e.g., `hero_051420-14Apr2026.png`)
+
+### On File CREATE (Write tool)
+- Add `Created: HH:MM DD-MMM-YYYY` as the FIRST line (or after shebang/frontmatter), using the file type's comment syntax.
+- For files with YAML frontmatter (`---` blocks like MDX/Markdown): place the timestamp as an HTML comment AFTER the closing `---`, before the content body. Never inside the frontmatter block.
+- For images: use timestamped filename pattern.
+- Get the exact time by running `date '+%H:%M %d-%b-%Y'` ONCE at the start of each session and reuse for all files in that response.
+
+### On File EDIT (Edit tool)
+- APPEND a new `Updated: HH:MM DD-MMM-YYYY` line after the last existing timestamp line (Created or previous Updated).
+- Never remove or overwrite existing timestamps — this is an append-only log.
+- Multiple updates stack chronologically:
+  ```
+  // Created: 04:53 14-Apr-2026
+  // Updated: 09:20 14-Apr-2026
+  // Updated: 16:45 15-Apr-2026
+  ```
+- **20-update cap**: Keep the `Created:` line + the 20 most recent `Updated:` lines. When a 21st update is added, remove the oldest `Updated:` line (not the `Created:` line — that is permanent). This prevents file headers from growing unbounded over months of edits.
+- If editing a legacy file with NO `Created:` line, add `Created: [unknown]` then `Updated: HH:MM DD-MMM-YYYY`.
+- For JSON config files, append the new timestamp string to the `"_updated"` array (cap at 20 entries, drop oldest).
+- For images: when regenerating, create a new file with a new timestamped filename.
+
+### Bulk Script Edits
+- When using Python scripts for bulk operations (5+ files), the script MUST add an `Updated:` timestamp line to every file it modifies — same format as manual edits.
+- Pattern: read the file, find the last `Created:` or `Updated:` line, insert a new `Updated:` line after it, write the file back.
+- Report in the script summary: "Updated timestamps in X/Y files."
+
+### Frontmatter & Parser Safety
+- **YAML frontmatter files** (MDX, Jekyll, Hugo, Astro): timestamps go AFTER the closing `---`, never inside the frontmatter block. Placing inside frontmatter can break parsers.
+- **Shebang files** (`#!/bin/bash`, `#!/usr/bin/env python`): timestamp goes on line 2, after the shebang.
+- **XML with declarations** (`<?xml version="1.0"?>`): timestamp comment goes after the XML declaration.
+
+### Git Merge Conflicts
+- Timestamp lines are simple and resolve trivially — keep both sides' timestamps in chronological order.
+- If a merge conflict occurs on timestamp lines, accept BOTH sets of `Updated:` entries sorted by date, then enforce the 20-update cap.
+
+### Exceptions (NO timestamps)
+- Generated/build output: lockfiles, node_modules, dist/, build/, .next/, compiled assets
+- Minified files: `.min.js`, `.min.css`, `.bundle.js` — these are effectively generated output
+- Third-party files not authored by Claude
+- Binary files that cannot hold comments and aren't images (e.g., .woff, .wasm, .zip)
+- Files in .git/ directory
+- Package manager files: package-lock.json, pnpm-lock.yaml, yarn.lock, Gemfile.lock, poetry.lock, go.sum
 
 ## Response Timestamps (ALL RESPONSES — NO EXCEPTIONS) (Insights 2026-04-11 M2-Max)
 - At the **start** of EVERY response, run `date '+%H:%M:%S %d-%b-%Y'` and print: `⏱ Started: HH:MM:SS DD-MMM-YYYY`
