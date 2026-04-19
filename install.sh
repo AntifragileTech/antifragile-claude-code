@@ -374,10 +374,21 @@ if [ "${1:-}" = "--module" ]; then
             12) install_learning_skills ;;
             13) install_templates ;;
             14) install_claude_flow ;;
+            --skip-*) ;;   # swallow skip flags passed through (no-op in module mode)
             *) echo "Unknown module: $mod" ;;
         esac
     done
+    # Still run CLAUDE.md merge and verify unless explicitly skipped — module-mode
+    # users benefit from the same self-heal as full installs.
+    if [ -f "$SCRIPT_DIR/scripts/merge-claude-md.sh" ] && [[ ! " $* " =~ " --skip-merge " ]]; then
+        echo ""
+        bash "$SCRIPT_DIR/scripts/merge-claude-md.sh" || true
+    fi
     print_summary
+    if [ -f "$SCRIPT_DIR/scripts/verify-install.sh" ] && [[ ! " $* " =~ " --skip-verify " ]]; then
+        echo ""
+        bash "$SCRIPT_DIR/scripts/verify-install.sh" || true
+    fi
     exit 0
 fi
 
@@ -409,7 +420,7 @@ install_claude_flow
 # Pulls the FULL set of rule sections (Response Timestamps, File Lifecycle,
 # Large File Handling, etc.) from other machines' pushed copies.
 # Additive only — never overwrites existing sections.
-if [ -f "$SCRIPT_DIR/scripts/merge-claude-md.sh" ]; then
+if [ -f "$SCRIPT_DIR/scripts/merge-claude-md.sh" ] && [[ ! " $* " =~ " --skip-merge " ]]; then
     echo ""
     bash "$SCRIPT_DIR/scripts/merge-claude-md.sh" || true
 fi

@@ -274,73 +274,12 @@ if stats["protected"] > 0:
 SYNC_SCRIPT
 ```
 
-### Step 3: Merge CLAUDE.md sections from other machines
-This step handles TWO merges:
-- **3a**: Full `##` section merge from other machines' global CLAUDE.md
-- **3b**: Insights-tagged section merge (finer-grained)
+### Step 3: Merge Insights-tagged sections from other machines into local CLAUDE.md
 
-#### Step 3a: Merge missing CLAUDE.md sections from other machines
-```bash
-python3 << 'CLAUDEMD_MERGE'
-import re, socket
-from pathlib import Path
+> Note: Full `##` section merge is already handled by `scripts/merge-claude-md.sh` in Step 1c.
+> Step 3 only handles the finer-grained **Insights**-tagged section merge below.
 
-HOME = Path.home()
-REPO_CMD = Path("/tmp/antifragile-pull/assets/claude-md")
-
-raw_host = socket.gethostname()
-short_host = raw_host.replace("Sumits-", "").replace(".local", "").replace(" ", "-")
-
-if not REPO_CMD.exists():
-    print("  No claude-md directory in repo — skipping")
-else:
-    local_global = HOME / ".claude" / "CLAUDE.md"
-    if not local_global.exists():
-        print("  No local ~/.claude/CLAUDE.md — skipping section merge")
-    else:
-        local_content = local_global.read_text(encoding="utf-8")
-        total_merged = 0
-
-        for md_file in sorted(REPO_CMD.glob("*-global.md")):
-            source_machine = md_file.stem.replace("-global", "")
-
-            # Skip our own file
-            if source_machine == short_host:
-                continue
-
-            remote_content = md_file.read_text(encoding="utf-8")
-
-            # Extract all ## level sections (top-level sections)
-            # Pattern: ## heading line + everything until next ## or end
-            pattern = r'(^## [^\n]+\n(?:(?!^## ).*\n?)*)'
-            remote_sections = re.findall(pattern, remote_content, re.MULTILINE)
-
-            new_to_add = []
-            for section in remote_sections:
-                section = section.strip()
-                header = section.split("\n")[0].strip()
-                # Only merge if this exact header doesn't exist locally
-                if header not in local_content:
-                    new_to_add.append(section)
-
-            if new_to_add:
-                with open(local_global, "a", encoding="utf-8") as f:
-                    f.write(f"\n\n## — Merged from {source_machine} via /sync-pull —\n")
-                    for s in new_to_add:
-                        f.write("\n" + s + "\n")
-                total_merged += len(new_to_add)
-                # Re-read to prevent duplicates across multiple source files
-                local_content = local_global.read_text(encoding="utf-8")
-                print(f"  + {len(new_to_add)} section(s) from {source_machine} → global CLAUDE.md")
-
-        if total_merged == 0:
-            print("  All CLAUDE.md sections already present locally")
-        else:
-            print(f"\n  Total: {total_merged} section(s) merged into ~/.claude/CLAUDE.md")
-CLAUDEMD_MERGE
-```
-
-#### Step 3b: Merge Insights sections from other machines into local CLAUDE.md
+#### Merge Insights sections from other machines into local CLAUDE.md
 ```bash
 python3 << 'INSIGHTS_MERGE'
 import re, socket

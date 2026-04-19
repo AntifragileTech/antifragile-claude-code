@@ -96,11 +96,15 @@ else
 fi
 
 # Phase 2 — skills/agents/commands/rules/bin (use existing modular install.sh)
+# IMPORTANT: pass --skip-deps and --skip-verify because bootstrap.sh runs
+# install-deps.sh (Phase 1) and verify-install.sh (Phase 5) itself. Without
+# these flags, install.sh would re-run them, causing duplicate work and
+# multiple CLAUDE.md backup files.
 echo -e "${YELLOW}▶ Phase 2: Skills, agents, commands, rules, bin scripts${NC}"
 if [ "$DRYRUN" = "1" ]; then
-  echo "  [DRY-RUN] would run: bash $REPO_ROOT/install.sh"
+  echo "  [DRY-RUN] would run: bash $REPO_ROOT/install.sh --skip-deps --skip-merge --skip-verify"
 else
-  bash "$REPO_ROOT/install.sh" < /dev/null || echo -e "  ${YELLOW}(install.sh returned non-zero — continuing)${NC}"
+  bash "$REPO_ROOT/install.sh" --skip-deps --skip-merge --skip-verify < /dev/null || echo -e "  ${YELLOW}(install.sh returned non-zero — continuing)${NC}"
 fi
 echo ""
 

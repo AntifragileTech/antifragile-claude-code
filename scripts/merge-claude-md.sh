@@ -50,18 +50,19 @@ fi
 mkdir -p "$HOME/.claude"
 [ -f "$DST" ] || touch "$DST"
 
-# Backup before any change
-BACKUP="$HOME/.claude/CLAUDE.md.backup-$(date +%Y%m%d-%H%M%S)"
-cp "$DST" "$BACKUP"
-say "Backup: $BACKUP"
-
+# Backup is created INSIDE Python — only if we're actually going to write.
+# This avoids cluttering ~/.claude/ with useless backups on no-op runs.
 export REPO_ROOT
 python3 << 'PYEOF'
 import re, os, json
 from pathlib import Path
 
 HOME = Path.home()
-REPO = Path(os.environ.get("REPO_ROOT", "/tmp/antifragile-install"))
+repo_env = os.environ.get("REPO_ROOT")
+if not repo_env:
+    print("  ERROR: REPO_ROOT not set — cannot locate source files")
+    raise SystemExit(1)
+REPO = Path(repo_env)
 SRC_DIR = REPO / "assets" / "claude-md"
 MACHINES = REPO / "assets" / "machines"
 DST = HOME / ".claude" / "CLAUDE.md"
@@ -129,6 +130,13 @@ for _, block in local_sections:
     out += block
 
 if added:
+    # Only backup when we're actually changing something
+    import shutil
+    from datetime import datetime
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup = HOME / ".claude" / f"CLAUDE.md.backup-{ts}"
+    shutil.copy2(DST, backup)
+    print(f"  Backup: {backup}")
     DST.write_text(out)
     print(f"  Merged {len(added)} section(s):")
     for src_name, hdr in added:
