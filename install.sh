@@ -381,6 +381,14 @@ if [ "${1:-}" = "--module" ]; then
     exit 0
 fi
 
+# --- NEW: Install external deps first (brew, gh, jq, node, python3, uv) ---
+# Skip with: --skip-deps
+if [ -f "$SCRIPT_DIR/scripts/install-deps.sh" ] && [[ ! " $* " =~ " --skip-deps " ]]; then
+    echo ""
+    bash "$SCRIPT_DIR/scripts/install-deps.sh" || echo -e "${YELLOW}(dep install had issues — continuing)${NC}"
+    echo ""
+fi
+
 # Install everything
 install_core_setup
 install_rules
@@ -396,7 +404,23 @@ install_ops_skills
 install_learning_skills
 install_templates
 install_claude_flow
+
+# --- NEW: Smart CLAUDE.md section merge from assets/claude-md/*-global.md ---
+# Pulls the FULL set of rule sections (Response Timestamps, File Lifecycle,
+# Large File Handling, etc.) from other machines' pushed copies.
+# Additive only — never overwrites existing sections.
+if [ -f "$SCRIPT_DIR/scripts/merge-claude-md.sh" ]; then
+    echo ""
+    bash "$SCRIPT_DIR/scripts/merge-claude-md.sh" || true
+fi
+
 print_summary
+
+# --- NEW: Final verification (non-fatal) ---
+if [ -f "$SCRIPT_DIR/scripts/verify-install.sh" ] && [[ ! " $* " =~ " --skip-verify " ]]; then
+    echo ""
+    bash "$SCRIPT_DIR/scripts/verify-install.sh" || true
+fi
 
 # Run security patches on existing skills (safe to re-run)
 if [ -f "$ASSETS_DIR/scripts/security-patch.sh" ]; then
