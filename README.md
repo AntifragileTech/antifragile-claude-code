@@ -2,7 +2,7 @@
 
 > Turn Claude Code from a basic assistant into a fully-equipped engineering, security, DevOps, and marketing powerhouse — with one prompt at a time.
 
-**570 skills** · **69 agents** · **97 commands** · **32 rules** · **7 bin scripts** · **16 prompt modules** · **Multi-machine sync** · **Zero scripting required**
+**570 skills** · **69 agents** · **98 commands** · **32 rules** · **7 bin scripts** · **16 prompt modules** · **4 installer scripts** · **Multi-machine sync** · **Zero scripting required**
 
 ---
 
@@ -53,13 +53,66 @@ Copy the prompt from [prompts/14-full-install.md](prompts/14-full-install.md) an
 
 ```bash
 git clone --depth 1 https://github.com/AntifragileTech/antifragile-claude-code.git /tmp/ccpp
-bash /tmp/ccpp/install.sh              # install everything
+bash /tmp/ccpp/install.sh              # install everything + auto-install deps
 bash /tmp/ccpp/install.sh --module 4   # install only dev skills
 bash /tmp/ccpp/install.sh --module 2 3 # install modules 2 and 3
 bash /tmp/ccpp/install.sh --list       # see available modules
 bash /tmp/ccpp/install.sh --status     # check what's installed
+bash /tmp/ccpp/install.sh --skip-deps  # skip brew/gh/node/uv install
+bash /tmp/ccpp/install.sh --skip-verify # skip post-install doctor check
 rm -rf /tmp/ccpp
 ```
+
+`install.sh` now auto-invokes four modular scripts — see **[Installer System](#installer-system)** below.
+
+---
+
+## Installer System
+
+The installer is split into four modular scripts under `scripts/`. Each has a **SAFETY CONTRACT** block at the top declaring exactly what it WILL and WILL NOT do.
+
+| Script | Purpose |
+|---|---|
+| `scripts/install-deps.sh` | Installs Homebrew, `gh` CLI, `jq`, `git`, `python3`, `node`, `uv` (macOS only). Idempotent — skips anything already present. |
+| `scripts/merge-claude-md.sh` | Smart `##` section merge from every machine's `assets/claude-md/*-global.md` into local `~/.claude/CLAUDE.md`. Timestamped backup before any write. |
+| `scripts/bootstrap.sh` | Orchestrator: runs deps → `install.sh` → CLAUDE.md merge → PATH/hooks/bin → verification. Supports `--dry-run`, `--yes`, `--skip-deps`, `--skip-verify`. |
+| `scripts/verify-install.sh` | `/doctor`-equivalent validation. Exits non-zero on any critical failure. Reports PASS / FAIL / WARN counts. |
+
+### Safety Contract (enforced in every script)
+
+| 🚫 NEVER | ✅ ALWAYS |
+|---|---|
+| Overwrites a customized user file | Creates timestamped backup before any CLAUDE.md write |
+| Replaces an existing `~/bin` script (even if repo version differs) | Keeps user's version with `⊘` warning |
+| Deletes any skill, agent, command, rule, or CLAUDE.md section | Adds missing items only |
+| Modifies existing `##` section content | Checks section header match, appends only what's missing |
+| Replaces hook handlers in `settings.json` | Adds new hook event types only |
+| Touches memory files, `NOTES.md`, `handoff.md`, project data | Prints `✓/⊘/+` markers for every action |
+| Removes any `permissions.allow` entry | Adds missing entries additively |
+
+### Team Safety
+
+If a teammate pulls this repo and their `~/.claude/CLAUDE.md` already has `## My Team's Custom Rules` or `## John's Workflow Notes` — those sections are **permanently preserved**. The merge only operates on headers our canonical sources ship, never on theirs. Re-running the installer is always safe.
+
+### Usage — Full Bootstrap
+
+```bash
+git clone --depth 1 https://github.com/AntifragileTech/antifragile-claude-code.git /tmp/ccpp
+bash /tmp/ccpp/scripts/bootstrap.sh          # interactive
+bash /tmp/ccpp/scripts/bootstrap.sh --yes    # non-interactive (CI-safe)
+bash /tmp/ccpp/scripts/bootstrap.sh --dry-run # show actions without executing
+rm -rf /tmp/ccpp
+```
+
+### Usage — Doctor (Anytime)
+
+Run the verifier standalone to diagnose a machine:
+
+```bash
+bash /tmp/ccpp/scripts/verify-install.sh
+```
+
+Or from inside Claude Code, just type `/doctor`.
 
 ---
 
@@ -141,6 +194,12 @@ Machine A                    GitHub Repo                   Machine B
 ~/bin/     ──────────────▶  assets/bin/              ◀────────────── ~/bin/
 ```
 
+`/sync-pull` now also automatically:
+1. Runs `scripts/install-deps.sh` — installs any missing CLI dep (`gh`, `uv`, `node`, `jq`, etc.)
+2. Runs `scripts/merge-claude-md.sh` — pulls any `##` sections missing locally from other machines' canonical CLAUDE.md copies
+
+This self-heals machines that were installed from the bare template and never received the full rule set (Response Timestamps, File Lifecycle Timestamps, Large File Handling, etc.).
+
 ### What Syncs
 
 | Asset | Push | Pull | Method |
@@ -212,7 +271,12 @@ antifragile-claude-code/
       thinking/      #   115 reasoning/meta skills
       learning/      #   1 learning skill
   prompts/           # 16 installation prompt modules
-  install.sh         # Script-based installer
+  scripts/           # Installer system (4 modular scripts)
+    install-deps.sh    #   Installs brew/gh/jq/node/python3/uv (macOS)
+    merge-claude-md.sh #   Smart additive CLAUDE.md section merge
+    bootstrap.sh       #   Full pipeline orchestrator
+    verify-install.sh  #   /doctor-equivalent validator
+  install.sh         # Script-based installer (auto-calls scripts/*)
   uninstall.sh       # Script-based rollback
 ```
 
@@ -294,6 +358,22 @@ Use `/sync-push` on the source machine, `/sync-pull` on others. Both commands ar
 
 **Q: Is my personal data safe?**
 Yes. Multi-layer scanning blocks pushes that contain usernames, project domains, or client names.
+
+**Q: I have my own custom sections / rules / skills. Will a pull overwrite them?**
+No. The installer's safety contract forbids overwriting any user content:
+- Custom CLAUDE.md sections (any `##` header we don't ship) are permanently preserved
+- Customized bin scripts in `~/bin/` are kept — you'll see a `⊘` warning showing it differs from repo but your version wins
+- Skills/agents/commands you've modified are skipped (we only add new ones)
+- Your `settings.json` hooks are never replaced — only new event types are added
+- Memory files, `NOTES.md`, `handoff.md`, project data are never touched
+
+A timestamped backup of CLAUDE.md is created before any write. Run `/doctor` anytime to see exactly what's on your machine.
+
+**Q: What happens if a teammate has their own learnings in CLAUDE.md?**
+They stay. The merge operates by `##` header match — if the header doesn't exist in our canonical sources, their section is untouched forever. Only sections with headers we ship (and which they don't have locally) get appended.
+
+**Q: Why does my new machine miss some CLAUDE.md sections after install?**
+Earlier versions of `install.sh` only installed the `Skill Auto-Discovery` section from the template. Other sections (Response Timestamps, File Lifecycle Timestamps, Large File Handling, etc.) were only available via `/sync-pull` from another machine's push. This is now fixed — `install.sh` auto-runs `scripts/merge-claude-md.sh` which pulls all sections from every machine's `assets/claude-md/*-global.md`. Run `/sync-pull` once to self-heal.
 
 ---
 
