@@ -35,6 +35,37 @@ Run this BEFORE starting work to get updates from other team members or devices.
 
 ## Steps
 
+### Step 0: Snapshot self-referential file checksums (for re-run detection)
+Before any sync, record SHA256 of the files whose updates mean "the user should
+run /sync-pull AGAIN to use the new version." This is what lets us show the
+`⚠️ RE-RUN /sync-pull` warning at the end — but ONLY to users who actually had
+stale copies. Users already on the latest version see no warning.
+
+```bash
+SELF_FILES=(
+  "$HOME/.claude/commands/sync-pull.md"
+  "$HOME/.claude/commands/sync-push.md"
+  "$HOME/bin/claude-hooks.sh"
+  "$HOME/bin/context-status.sh"
+)
+declare -A PRE_HASHES
+for f in "${SELF_FILES[@]}"; do
+  if [ -f "$f" ]; then
+    PRE_HASHES["$f"]=$(shasum -a 256 "$f" | awk '{print $1}')
+  else
+    PRE_HASHES["$f"]="MISSING"
+  fi
+done
+# Also snapshot scripts/ dir (new installer modules)
+for f in "$HOME/.claude/scripts/"{install-deps.sh,merge-claude-md.sh,bootstrap.sh,verify-install.sh}; do
+  if [ -f "$f" ]; then
+    PRE_HASHES["$f"]=$(shasum -a 256 "$f" | awk '{print $1}')
+  else
+    PRE_HASHES["$f"]="MISSING"
+  fi
+done
+```
+
 ### Step 1: Clone or pull latest
 ```bash
 if [ -d /tmp/antifragile-pull/.git ]; then
@@ -395,6 +426,53 @@ echo "  Skills:   $(find ~/.claude/skills -maxdepth 1 -type d 2>/dev/null | wc -
 echo "  Agents:   $(find ~/.claude/agents -type f 2>/dev/null | wc -l | tr -d ' ')"
 echo "  Commands: $(find ~/.claude/commands -type f 2>/dev/null | wc -l | tr -d ' ')"
 echo "  Rules:    $(find ~/.claude/rules -type f 2>/dev/null | wc -l | tr -d ' ')"
+```
+
+### Step 7b: Detect if /sync-pull itself (or helper scripts) were just updated — SELECTIVE RE-RUN NOTICE
+Compare each self-referential file's SHA256 against the pre-sync snapshot from Step 0.
+If ANY of them changed, this pull brought a newer version of the pull infrastructure
+itself — but the CURRENT run used the OLD version. Prompt the user to re-run so they
+get the benefits.
+
+**This notice is SELECTIVE**: only shown to users whose infrastructure files actually
+changed. Users already on the latest version see nothing.
+
+```bash
+CHANGED=()
+for f in "${SELF_FILES[@]}" "$HOME/.claude/scripts/"{install-deps.sh,merge-claude-md.sh,bootstrap.sh,verify-install.sh}; do
+  if [ -f "$f" ]; then
+    POST_HASH=$(shasum -a 256 "$f" | awk '{print $1}')
+  else
+    POST_HASH="MISSING"
+  fi
+  PRE_HASH="${PRE_HASHES[$f]:-MISSING}"
+  if [ "$POST_HASH" != "$PRE_HASH" ] && [ "$POST_HASH" != "MISSING" ]; then
+    CHANGED+=("$(basename "$f")")
+  fi
+done
+
+if [ ${#CHANGED[@]} -gt 0 ]; then
+  echo ""
+  echo "╔═════════════════════════════════════════════════════════════════╗"
+  echo "║  ⚠️  ACTION REQUIRED: RE-RUN /sync-pull                           ║"
+  echo "╠═════════════════════════════════════════════════════════════════╣"
+  echo "║  This pull just updated the sync infrastructure itself:         ║"
+  for c in "${CHANGED[@]}"; do
+    printf "║    • %-60s║\n" "$c"
+  done
+  echo "║                                                                 ║"
+  echo "║  The CURRENT /sync-pull run used the OLD version of these       ║"
+  echo "║  files. To activate the new features (better CLAUDE.md merge,   ║"
+  echo "║  auto-dep-install, timestamp-rule re-injection hook, etc.),     ║"
+  echo "║  please run:                                                    ║"
+  echo "║                                                                 ║"
+  echo "║      /sync-pull                                                 ║"
+  echo "║                                                                 ║"
+  echo "║  one more time. The second run uses the new versions and is a  ║"
+  echo "║  no-op for anyone already current.                              ║"
+  echo "╚═════════════════════════════════════════════════════════════════╝"
+  echo ""
+fi
 ```
 
 ### Step 8: Clean up
