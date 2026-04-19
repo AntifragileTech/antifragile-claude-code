@@ -45,6 +45,22 @@ else
 fi
 ```
 
+### Step 1b: Ensure external dependencies (brew, gh, jq, node, python3, uv)
+Runs `scripts/install-deps.sh` from the cloned repo — idempotent, only installs what's missing.
+```bash
+if [ -f /tmp/antifragile-pull/scripts/install-deps.sh ]; then
+  YES=1 bash /tmp/antifragile-pull/scripts/install-deps.sh || echo "(deps had issues — continuing)"
+fi
+```
+
+### Step 1c: Full CLAUDE.md section merge (smart, additive-only)
+Runs `scripts/merge-claude-md.sh` — merges ANY missing `##` sections from `assets/claude-md/*-global.md` files (all machines' pushed CLAUDE.md content). Backs up before modifying. Never overwrites existing sections.
+```bash
+if [ -f /tmp/antifragile-pull/scripts/merge-claude-md.sh ]; then
+  bash /tmp/antifragile-pull/scripts/merge-claude-md.sh
+fi
+```
+
 ### Step 2: Run smart sync
 ```bash
 python3 << 'SYNC_SCRIPT'
@@ -207,16 +223,17 @@ if hooks_src.exists():
         hooks_dst.chmod(0o755)
 
 # ============================================================
-# SYNC: Bin scripts (SMART MERGE — protect local edits)
+# SYNC: Bin scripts (context-status.sh, etc.)
 # ============================================================
 print("\nBin scripts:")
 bin_src = REPO / "bin"
 bin_dst = HOME / "bin"
-if bin_src.exists():
-    for f in sorted(bin_src.iterdir()):
-        if f.is_file():
-            dst = bin_dst / f.name
-            sync_file(f, dst, f"bin/{f.name}", "smart_merge")
+bin_dst.mkdir(parents=True, exist_ok=True)
+if bin_src.exists() and bin_src.is_dir():
+    for script in sorted(bin_src.iterdir()):
+        if script.is_file() and script.name.startswith(("context-", "claude-")):
+            dst = bin_dst / script.name
+            sync_file(script, dst, f"bin/{script.name}", "smart_merge")
             if dst.exists():
                 dst.chmod(0o755)
 
