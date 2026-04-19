@@ -25,6 +25,23 @@ case "${1:-}" in
 
   session-start)
     log "START" "dir=$(pwd)"
+    # --- Announce CRITICAL rules prominently at session start ---
+    # These are the rules most likely to drift during long sessions.
+    cat <<'SESSIONRULES'
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔒 SESSION STARTED — CRITICAL RULES ACTIVE (full details in ~/.claude/CLAUDE.md)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• TIMESTAMPS: every response begins with ⏱ Started: and ends with
+  ⏱ Completed: ... | ctx: ~NK/1M (N%). No exceptions.
+• FILE TIMESTAMPS: every created/edited file gets Created/Updated
+  comments per File Lifecycle rule.
+• NEVER OVERWRITE: user content (skills, commands, CLAUDE.md sections)
+  is additive-only — never replace existing.
+• AUTO-DISCOVER SKILLS: before any task, match to an installed skill
+  before writing code. Don't ask user to invoke manually.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SESSIONRULES
+
     # Check OAuth token validity for MCP plugins
     if command -v claude >/dev/null 2>&1; then
       # Quick check: if claude-mem token file exists and is recent
@@ -179,6 +196,26 @@ case "${1:-}" in
   # ═══════════════════════════════════
 
   check-prompt)
+    # --- Re-inject CRITICAL rules into EVERY user turn via stdout ---
+    # stdout from UserPromptSubmit becomes additional_context for the LLM,
+    # bypassing the buried-in-700-line-CLAUDE.md problem where rules drift out
+    # of active enforcement during long tool-output streams.
+    cat <<'REMINDER'
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔒 CRITICAL RULES — ENFORCE THIS RESPONSE (from ~/.claude/CLAUDE.md)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. START every response with: ⏱ Started: HH:MM:SS DD-MMM-YYYY
+   (run: date '+%H:%M:%S %d-%b-%Y')
+2. END every response with:   ⏱ Completed: HH:MM:SS DD-MMM-YYYY (took XmYs) | ctx: ~NK/1M (N%)
+   (run: date + $HOME/bin/context-status.sh)
+3. NO EXCEPTIONS — applies to short answers, conversational replies,
+   tool-heavy responses, everything.
+4. Every file created MUST have 'Created: HH:MM DD-MMM-YYYY' on line 1/2
+   (after shebang/frontmatter) per File Lifecycle Timestamps rule.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REMINDER
+
+    # --- Context size warnings (to stderr, not LLM context) ---
     TPATH=$(py "print(d.get('transcript_path',''))")
     if [ -n "$TPATH" ] && [ -f "$TPATH" ]; then
       KB=$(( $(wc -c < "$TPATH" | tr -d ' ') / 1024 ))
