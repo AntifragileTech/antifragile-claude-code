@@ -1,0 +1,34 @@
+# Antifragile Claude Code — Personal data scan patterns (per-user)
+#
+# Copy this file to ~/.claude/.sync-scan-patterns and edit the values.
+# This file is READ by /sync-push before copying files to the repo.
+# It is NEVER synced to the repo (kept local only).
+#
+# Format: KEY="regex1|regex2|regex3"  (pipe-separated, standard ERE)
+# Any empty value is ignored (no matching attempted).
+#
+# Created: 07:35 19-Apr-2026
+
+# Your real usernames that appear in paths or emails.
+# Example: if your macOS user is "alice.smith", set USERNAMES="alice\.smith|asmith"
+USERNAMES=""
+
+# Your real domains, company names, or client domains that shouldn't leak.
+# Example: DOMAINS="mycompany\.com|acme-internal|widgets-corp"
+DOMAINS=""
+
+# Client project names / codewords that are private.
+# Example: CLIENTS="PROJECT-ORION|BigClient"
+CLIENTS=""
+
+# Your personal email addresses.
+# Example: EMAILS="alice@gmail\.com|a\.smith@work\.com"
+EMAILS=""
+
+# Hostname prefix to STRIP when naming machine-specific files.
+# For "Alices-MacBook-Pro.local" -> short name "MacBook-Pro", set HOSTNAME_PREFIX="Alices-"
+# Leave empty to use hostname as-is (minus .local suffix).
+HOSTNAME_PREFIX=""
+
+# Generic always-block patterns (secrets) — leave these alone unless you know what you're doing.
+GENERIC_SECRETS="sk_live_|sk_test_|ghp_[a-zA-Z0-9]{36}|xox[baprs]-|AKIA[0-9A-Z]{16}|-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----"

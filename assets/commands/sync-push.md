@@ -40,33 +40,59 @@ Before copying ANY files to the repo, scan all files that will be pushed for per
 echo "🔒 Pre-push personal data scan..."
 PERSONAL_FOUND=0
 
-# Scan local config files that will be pushed
+# Load per-user scan patterns (never synced — lives only on each machine).
+# If the user has ~/.claude/.sync-scan-patterns, source it. Otherwise use
+# generic defaults that work for any machine/user.
+USERNAMES=""
+DOMAINS=""
+CLIENTS=""
+EMAILS=""
+HOSTNAME_PREFIX=""
+GENERIC_SECRETS="sk_live_|sk_test_|ghp_[a-zA-Z0-9]{36}|xox[baprs]-|AKIA[0-9A-Z]{16}|-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----"
+
+if [ -f "$HOME/.claude/.sync-scan-patterns" ]; then
+  # shellcheck disable=SC1091
+  source "$HOME/.claude/.sync-scan-patterns"
+  echo "  Loaded personal scan patterns from ~/.claude/.sync-scan-patterns"
+else
+  echo "  ℹ  No ~/.claude/.sync-scan-patterns found — using generic patterns only."
+  echo "     Copy assets/sync-scan-patterns.template to ~/.claude/.sync-scan-patterns"
+  echo "     and fill in YOUR usernames/domains/clients for stronger protection."
+fi
+
+# Always scan for: current user's shell username and generic secrets
+CURRENT_USER="$(whoami)"
+# Build dynamic pattern list (skip empty ones)
+check_pattern() {
+  local label="$1"
+  local pattern="$2"
+  [ -z "$pattern" ] && return 0
+  for dir in ~/.claude/commands ~/.claude/agents ~/.claude/rules ~/.claude/skills; do
+    [ -d "$dir" ] || continue
+    if grep -rlE "$pattern" "$dir" 2>/dev/null | head -5 | grep -q .; then
+      echo "  ⚠️  Found $label in:"
+      grep -rlE "$pattern" "$dir" 2>/dev/null | head -5 | sed 's/^/    /'
+      PERSONAL_FOUND=$((PERSONAL_FOUND + 1))
+    fi
+  done
+}
+
+# Always check current user's home/username (auto-detected, no config needed)
+check_pattern "current user path" "/Users/$CURRENT_USER|/home/$CURRENT_USER"
+
+# Config-driven checks (only if user has set them)
+[ -n "$USERNAMES" ]       && check_pattern "personal usernames"    "$USERNAMES"
+[ -n "$DOMAINS" ]         && check_pattern "personal domains"      "$DOMAINS"
+[ -n "$CLIENTS" ]         && check_pattern "client names"          "$CLIENTS"
+[ -n "$EMAILS" ]          && check_pattern "personal emails"       "$EMAILS"
+[ -n "$GENERIC_SECRETS" ] && check_pattern "secrets/tokens"        "$GENERIC_SECRETS"
+
+# Always check for cache/transcript dirs
 for dir in ~/.claude/commands ~/.claude/agents ~/.claude/rules ~/.claude/skills; do
-  if [ -d "$dir" ]; then
-    # Check for real usernames in paths
-    if grep -rl "/Users/$(whoami)\|/home/$(whoami)\|$(whoami)" "$dir" 2>/dev/null | head -5 | grep -q .; then
-      echo "  ⚠️  Found personal username in:"
-      grep -rl "/Users/$(whoami)\|/home/$(whoami)\|$(whoami)" "$dir" 2>/dev/null | head -5
-      PERSONAL_FOUND=$((PERSONAL_FOUND + 1))
-    fi
-    # Check for project-specific domains/emails
-    if grep -rl 'novauptime\.com\|ghugharwal-uptime\|wareone\|monitor@nova' "$dir" 2>/dev/null | head -5 | grep -q .; then
-      echo "  ⚠️  Found project-specific domains in:"
-      grep -rl 'novauptime\.com\|ghugharwal-uptime\|wareone\|monitor@nova' "$dir" 2>/dev/null | head -5
-      PERSONAL_FOUND=$((PERSONAL_FOUND + 1))
-    fi
-    # Check for client names
-    if grep -rl 'LMSGUM\|Vibe Code/Clients' "$dir" 2>/dev/null | head -5 | grep -q .; then
-      echo "  ⚠️  Found client names in:"
-      grep -rl 'LMSGUM\|Vibe Code/Clients' "$dir" 2>/dev/null | head -5
-      PERSONAL_FOUND=$((PERSONAL_FOUND + 1))
-    fi
-    # Check for cache/transcript data
-    if find "$dir" -name ".cache" -type d 2>/dev/null | grep -q .; then
-      echo "  ⚠️  Found cache directories in:"
-      find "$dir" -name ".cache" -type d 2>/dev/null
-      PERSONAL_FOUND=$((PERSONAL_FOUND + 1))
-    fi
+  if [ -d "$dir" ] && find "$dir" -name ".cache" -type d 2>/dev/null | grep -q .; then
+    echo "  ⚠️  Found cache directories in $dir"
+    find "$dir" -name ".cache" -type d 2>/dev/null | sed 's/^/    /'
+    PERSONAL_FOUND=$((PERSONAL_FOUND + 1))
   fi
 done
 
@@ -74,8 +100,8 @@ if [ "$PERSONAL_FOUND" -gt 0 ]; then
   echo ""
   echo "❌ BLOCKED: $PERSONAL_FOUND personal data issue(s) found."
   echo "   Fix these before pushing. Replace with generic equivalents:"
-  echo "   - /Users/\$(whoami) → /Users/username or ~"
-  echo "   - novauptime.com → yourdomain.com"
+  echo "   - /Users/\$USER → /Users/username or ~"
+  echo "   - Your real domains → yourdomain.com"
   echo "   - Client names → MyApp, MyProject"
   echo "   - Delete .cache/ directories"
   echo ""
@@ -190,7 +216,12 @@ REPO = Path("/tmp/antifragile-push/assets/claude-md")
 REPO.mkdir(parents=True, exist_ok=True)
 
 raw_host = socket.gethostname()
-short_host = raw_host.replace("Sumits-", "").replace(".local", "").replace(" ", "-")
+import os
+prefix = os.environ.get("HOSTNAME_PREFIX", "")  # from ~/.claude/.sync-scan-patterns
+short_host = raw_host
+if prefix:
+    short_host = short_host.removeprefix(prefix) if hasattr(str, "removeprefix") else (short_host[len(prefix):] if short_host.startswith(prefix) else short_host)
+short_host = short_host.replace(".local", "").replace(" ", "-")
 
 # Push global CLAUDE.md
 global_cmd = HOME / ".claude" / "CLAUDE.md"
@@ -223,7 +254,12 @@ REPO.mkdir(parents=True, exist_ok=True)
 
 # Short hostname for file naming (e.g., "M2-Max" from "Sumits-M2-Max.local")
 raw_host = socket.gethostname()
-short_host = raw_host.replace("Sumits-", "").replace(".local", "").replace(" ", "-")
+import os
+prefix = os.environ.get("HOSTNAME_PREFIX", "")  # from ~/.claude/.sync-scan-patterns
+short_host = raw_host
+if prefix:
+    short_host = short_host.removeprefix(prefix) if hasattr(str, "removeprefix") else (short_host[len(prefix):] if short_host.startswith(prefix) else short_host)
+short_host = short_host.replace(".local", "").replace(" ", "-")
 
 # Collect all CLAUDE.md files to scan
 claude_files = []
@@ -288,7 +324,22 @@ cd /tmp/antifragile-push
 REPO_ISSUES=0
 
 # Scan ALL text files in the repo for personal data patterns
-PATTERNS='sumitghugharwal|/Users/sumit|/home/sumit|novauptime\.com|ghugharwal-uptime|wareone|monitor@nova|LMSGUM|Vibe Code/Clients|FlipLink|perfolio-web-mark|Sumits-M2-Max'
+# Load per-user patterns for final repo-side scan
+if [ -f "$HOME/.claude/.sync-scan-patterns" ]; then
+  source "$HOME/.claude/.sync-scan-patterns"
+fi
+# Build pattern from config + auto-detected current user
+PATTERNS_LIST=()
+[ -n "${USERNAMES:-}" ]       && PATTERNS_LIST+=("$USERNAMES")
+[ -n "${DOMAINS:-}" ]         && PATTERNS_LIST+=("$DOMAINS")
+[ -n "${CLIENTS:-}" ]         && PATTERNS_LIST+=("$CLIENTS")
+[ -n "${EMAILS:-}" ]          && PATTERNS_LIST+=("$EMAILS")
+[ -n "${GENERIC_SECRETS:-}" ] && PATTERNS_LIST+=("$GENERIC_SECRETS")
+PATTERNS_LIST+=("/Users/$(whoami)|/home/$(whoami)")
+# Join with | separator
+IFS='|' PATTERNS="${PATTERNS_LIST[*]}"
+# Fallback if user has no config — use generic safe default
+[ -z "$PATTERNS" ] && PATTERNS="sk_live_|ghp_[a-zA-Z0-9]{36}|-----BEGIN.*PRIVATE KEY-----"
 
 FOUND_FILES=$(grep -rl "$PATTERNS" assets/ 2>/dev/null | grep -v '.json$' | head -20)
 if [ -n "$FOUND_FILES" ]; then
@@ -313,7 +364,8 @@ fi
 
 # Machine JSON is OK — it's supposed to have hostname/user
 # But check it doesn't have project paths
-FOUND_MACHINE=$(grep -l "Vibe Code\|FlipLink\|novauptime\|wareone\|LMSGUM" assets/machines/*.json 2>/dev/null)
+# Re-use same PATTERNS set above for machine-file scan
+FOUND_MACHINE=$(grep -lE "$PATTERNS" assets/machines/*.json 2>/dev/null)
 if [ -n "$FOUND_MACHINE" ]; then
   echo "  ⚠️  Project names leaked into machine signature:"
   echo "$FOUND_MACHINE"
@@ -337,7 +389,11 @@ fi
 cd /tmp/antifragile-push
 
 # Write machine signature to manifest
-SHORT_HOST=$(hostname -s | sed 's/Sumits-//; s/\.local//')
+# Use HOSTNAME_PREFIX from ~/.claude/.sync-scan-patterns if set (per-user config)
+if [ -f "$HOME/.claude/.sync-scan-patterns" ]; then
+  source "$HOME/.claude/.sync-scan-patterns"
+fi
+SHORT_HOST=$(hostname -s | sed "s/^${HOSTNAME_PREFIX:-}//; s/\.local$//")
 mkdir -p assets/machines
 cat > "assets/machines/${SHORT_HOST}.json" << MACHINE_EOF
 {

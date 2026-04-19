@@ -40,10 +40,34 @@ confirm() {
 }
 
 # --- OS check ---
-if [ "$(uname -s)" != "Darwin" ]; then
-  err "This installer is macOS-only. Exiting."
-  exit 1
-fi
+OS="$(uname -s)"
+case "$OS" in
+  Darwin)
+    ok "macOS detected — proceeding with Homebrew-based install"
+    ;;
+  Linux)
+    warn "Linux detected. This installer uses Homebrew (macOS)."
+    warn "On Linux, install these manually with your package manager:"
+    warn "  Ubuntu/Debian: sudo apt install git gh jq python3 nodejs && curl -LsSf https://astral.sh/uv/install.sh | sh"
+    warn "  Fedora/RHEL:   sudo dnf install git gh jq python3 nodejs && curl -LsSf https://astral.sh/uv/install.sh | sh"
+    warn "Then re-run: bash scripts/bootstrap.sh --skip-deps"
+    exit 0
+    ;;
+  MINGW*|MSYS*|CYGWIN*)
+    warn "Windows (Git Bash/Cygwin) detected."
+    warn "This installer targets macOS Homebrew. On Windows you have two options:"
+    warn "  1. WSL2 (recommended): install Ubuntu, then run this installer inside WSL"
+    warn "  2. Install deps via winget or scoop:"
+    warn "     winget install Git.Git GitHub.cli jqlang.jq Python.Python.3 OpenJS.NodeJS astral-sh.uv"
+    warn "Then re-run: bash scripts/bootstrap.sh --skip-deps"
+    exit 0
+    ;;
+  *)
+    err "Unsupported OS: $OS — this installer targets macOS."
+    err "Install git, gh, jq, python3, node, uv manually, then run: bash scripts/bootstrap.sh --skip-deps"
+    exit 1
+    ;;
+esac
 
 # --- 1. Homebrew ---
 say "Checking Homebrew..."
