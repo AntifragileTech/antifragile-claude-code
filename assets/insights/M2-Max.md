@@ -45,3 +45,49 @@
 - This applies to ALL responses — short answers, conversational replies, task responses, everything. No exceptions.
 - This gives the user visibility into how long every interaction takes and how much context is consumed.
 
+## Environment Variables (Insights 2026-05-07 M2-Max)
+<!-- Created: 22:38 07-May-2026 -->
+- ALWAYS verify env var names match what's actually in .env before making API calls (e.g., GODADDY_API_KEY_1 not GD_API_KEY_1, SENDGRID_API_KEY_* not Stripe keys)
+- If an API call fails with auth errors, FIRST check env var naming conventions in the relevant CLAUDE.md, don't retry blindly
+- For Cloudflare/SendGrid multi-account setups, confirm which numbered account (1/2/3) owns the resource before executing
+
+### Large File Set Dispatch (>50 files) (Insights 2026-05-07 M2-Max)
+<!-- Updated: 22:40 07-May-2026 -->
+- For audits/analyses spanning **>50 files** (SEO sweeps, codebase reviews, content libraries), NEVER read sequentially in main context — you will hit "Prompt is too long" mid-stream
+- Plan **before reading**: bucket the files into 6-8 groups by category (homepage / blog / platform / podcast / etc.) and dispatch ONE Task agent per bucket
+- Each agent returns a **≤2KB summary** with a strict output schema — NOT the full file contents
+- Synthesize at the end in the main session from the summaries only
+- Existing skills to leverage: `dispatching-parallel-agents`, `do-in-parallel`, `parallel-bugfix`, `parallel-qa`, `seo-audit`, `seo-pipeline` — prefer invoking these over building from scratch
+- Reference precedent: 172-file UserEvidence audit succeeded with 8 parallel agents → 11 output files; sequential attempts hit prompt length limits 3+ times
+
+## Build & Indexing (Insights 2026-05-07 M2-Max)
+<!-- Created: 22:38 07-May-2026 -->
+
+### Pre-flight Check for Long-Running Indexers (Insights 2026-05-07 M2-Max)
+<!-- Updated: 22:40 07-May-2026 -->
+Before launching ANY long-running indexer (code-review-graph / CRG, AST scans, embeddings builds, large repo crawls), run this 30-second pre-flight:
+```bash
+pwd && \
+  git rev-parse --show-toplevel 2>/dev/null && \
+  find . -type f -not -path './node_modules/*' -not -path './.git/*' -not -path './dist/*' -not -path './build/*' | wc -l && \
+  du -sh . 2>/dev/null && \
+  vm_stat 2>/dev/null | head -5  # macOS memory; use `free -h` on Linux
+```
+Decision rules:
+- If file count > 20K → propose chunked or excluded-paths strategy BEFORE starting
+- If repo size > 2GB → expect OOM risk on default memory limits; chunk by subdirectory
+- If cwd ≠ git root → STOP and `cd` to git root first
+- Reference precedent: 25-project CRG batch had OOM kills on a 4.2GB project and an 11GB project (exit 137); the 11GB project also wrong-dir-scanned 38K node_modules files before kill
+- Existing skill: `infra-healthcheck` — invoke for pre-deploy/pre-build checks rather than reinventing
+
+## Workflows (Insights 2026-05-07 M2-Max)
+<!-- Created: 22:38 07-May-2026 -->
+
+## Verification Discipline (Insights 2026-05-07 M2-Max)
+<!-- Created: 22:40 07-May-2026 -->
+
+## Recommended Setup — Not Auto-Applied (Insights 2026-05-07 M2-Max)
+<!-- Created: 22:40 07-May-2026 -->
+
+These are infrastructure recommendations from the insights report. They are NOT installed automatically because they require user-controlled credentials or are too noisy to apply globally. Install on demand:
+

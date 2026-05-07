@@ -30,6 +30,12 @@ You have 567+ installed skills (including gstack), 93+ commands, and 68+ agents.
 - **Thinking**: tree-of-thoughts, root-cause-tracing, kaizen, critique, brainstorming, debate
 - **Marketing**: copywriting, seo-audit, page-cro, signup-flow-cro, cold-email, content-strategy, ad-creative
 
+## Environment Variables (Insights 2026-05-07 M2-Max)
+<!-- Created: 22:38 07-May-2026 -->
+- ALWAYS verify env var names match what's actually in .env before making API calls (e.g., GODADDY_API_KEY_1 not GD_API_KEY_1, SENDGRID_API_KEY_* not Stripe keys)
+- If an API call fails with auth errors, FIRST check env var naming conventions in the relevant CLAUDE.md, don't retry blindly
+- For Cloudflare/SendGrid multi-account setups, confirm which numbered account (1/2/3) owns the resource before executing
+
 ## Large File Handling Rules
 - Always run `wc -l <file>` before reading ANY file.
 - If a file is over 300 lines, NEVER read it fully. Use grep, head, tail, or sed to read only the relevant portion.
@@ -79,6 +85,15 @@ You have 567+ installed skills (including gstack), 93+ commands, and 68+ agents.
 - Good for agents: Create a single component (<200 lines), run a test suite, lint a file, generate a config
 - Bad for agents: Create a full page (500+ lines), generate long-form content with full markup, multi-file creation
 - Borderline: Blog pages — only if using a pre-built template and just filling in content (under 300 lines)
+
+### Large File Set Dispatch (>50 files) (Insights 2026-05-07 M2-Max)
+<!-- Updated: 22:40 07-May-2026 -->
+- For audits/analyses spanning **>50 files** (SEO sweeps, codebase reviews, content libraries), NEVER read sequentially in main context — you will hit "Prompt is too long" mid-stream
+- Plan **before reading**: bucket the files into 6-8 groups by category (homepage / blog / platform / podcast / etc.) and dispatch ONE Task agent per bucket
+- Each agent returns a **≤2KB summary** with a strict output schema — NOT the full file contents
+- Synthesize at the end in the main session from the summaries only
+- Existing skills to leverage: `dispatching-parallel-agents`, `do-in-parallel`, `parallel-bugfix`, `parallel-qa`, `seo-audit`, `seo-pipeline` — prefer invoking these over building from scratch
+- Reference precedent: 172-file UserEvidence audit succeeded with 8 parallel agents → 11 output files; sequential attempts hit prompt length limits 3+ times
 
 ## Bulk/Batch Operations — Use Python Scripts, Not AI
 - For ANY task that involves modifying, generating, or processing more than 5 files with a repeatable pattern, **write a Python script** in `/tmp/` and execute it — do NOT make edits file-by-file with AI.
@@ -202,3 +217,90 @@ Read NOTES.md and the project handoff at ~/.claude/projects/[project-key]/memory
 ```
 - The user should be able to copy this block and paste it into a new session to resume instantly.
 - Do NOT ask "should I generate a continuation prompt?" — always generate it automatically.
+
+## Build & Indexing (Insights 2026-05-07 M2-Max)
+<!-- Created: 22:38 07-May-2026 -->
+
+### Working Directory Discipline
+- Before running build/index commands (code-review-graph, etc.), verify cwd is the git root, not a parent directory
+- Use `git rev-parse --show-toplevel` to confirm before long-running scans
+- Never scan node_modules or parent directories — abort if file count exceeds expectation
+
+### Pre-flight Check for Long-Running Indexers (Insights 2026-05-07 M2-Max)
+<!-- Updated: 22:40 07-May-2026 -->
+Before launching ANY long-running indexer (code-review-graph / CRG, AST scans, embeddings builds, large repo crawls), run this 30-second pre-flight:
+```bash
+pwd && \
+  git rev-parse --show-toplevel 2>/dev/null && \
+  find . -type f -not -path './node_modules/*' -not -path './.git/*' -not -path './dist/*' -not -path './build/*' | wc -l && \
+  du -sh . 2>/dev/null && \
+  vm_stat 2>/dev/null | head -5  # macOS memory; use `free -h` on Linux
+```
+Decision rules:
+- If file count > 20K → propose chunked or excluded-paths strategy BEFORE starting
+- If repo size > 2GB → expect OOM risk on default memory limits; chunk by subdirectory
+- If cwd ≠ git root → STOP and `cd` to git root first
+- Reference precedent: 25-project CRG batch had OOM kills on a 4.2GB project and an 11GB project (exit 137); the 11GB project also wrong-dir-scanned 38K node_modules files before kill
+- Existing skill: `infra-healthcheck` — invoke for pre-deploy/pre-build checks rather than reinventing
+
+## Workflows (Insights 2026-05-07 M2-Max)
+<!-- Created: 22:38 07-May-2026 -->
+
+### Session Saving
+- When user says 'save' or 'save session', write handoff docs, update NOTES.md, and update session indexes — this is a known recurring workflow
+- The `/save` slash command at `~/.claude/commands/save.md` already implements the canonical save flow — invoke it, don't reimplement
+
+## Verification Discipline (Insights 2026-05-07 M2-Max)
+<!-- Created: 22:40 07-May-2026 -->
+
+### Verify Before Claiming "Found"
+Before reporting success on ANY lookup, audit, or discovery task (domain status, account ownership, user existence, tracker presence, file existence, URL resolution), run a second-pass verification:
+1. **Re-grep** for any tools/IDs/identifiers you might have missed (Factors.ai pixel, Clarity ID origin, secondary shareholders, etc.)
+2. **Check status fields** explicitly — expired vs active vs deleted vs pending. Don't assume "exists in API response" = "available for use"
+3. **Resolve URLs** you reference — `curl -I` any subdomain (demo.*, staging.*, app.*) before recommending it. Non-existent demo subdomains have been referenced in past sessions
+4. **Report verification results explicitly** — say "verified via X" or "could not verify, treat as unconfirmed", not bare "found"
+
+Reference precedents (do not repeat):
+- Reported expired hidemo.site as "found" — failed to check expiry status
+- Misattributed Microsoft Clarity ID origin between two clients
+- Missed Factors.ai pixel in tracker audit until user prompted second pass
+- Skipped second shareholder's passport files until prompted twice
+- Referenced non-existent `demo.<client>.net` subdomain
+
+Existing skills: `verification-before-completion`, `verification-loop`, `/verify`, `/verify-deploy` — invoke before reporting completion on multi-step or audit tasks.
+
+## Recommended Setup — Not Auto-Applied (Insights 2026-05-07 M2-Max)
+<!-- Created: 22:40 07-May-2026 -->
+
+These are infrastructure recommendations from the insights report. They are NOT installed automatically because they require user-controlled credentials or are too noisy to apply globally. Install on demand:
+
+### MCP Servers (require API keys — install per-project as needed)
+```bash
+# Stripe — typed API access instead of curl chains
+claude mcp add stripe -- npx -y @stripe/mcp --tools=all --api-key=$STRIPE_SECRET_KEY
+
+# Cloudflare — DNS/zone management
+claude mcp add cloudflare -- npx -y @cloudflare/mcp-server-cloudflare
+```
+Why deferred: each MCP needs the correct numbered account key (per env-var rules above) and adds tool definitions to context. Install only in projects that actively use that provider.
+
+### Project-Scoped TypeScript Hook (DO NOT install globally)
+For Next.js / TS projects only, add to `<project>/.claude/settings.json`:
+```json
+{
+  "hooks": {
+    "PostToolUse": [{
+      "matcher": "Edit|Write",
+      "hooks": [{"type": "command", "command": "if [ -f tsconfig.json ]; then npx tsc --noEmit 2>&1 | head -20; fi"}]
+    }]
+  }
+}
+```
+Why not global: would run `tsc` on every Edit/Write in non-TS projects (Python scripts, docs, HTML sites) — pure noise.
+
+### Ambitious Workflows (queued for dedicated sessions)
+- **Autonomous SEO audit pipeline** — leverage existing `seo-audit` + `seo-pipeline` skills with 8-agent parallel dispatch, write findings to `audits/<dimension>.md`, synthesize `audits/REPORT.md`
+- **`infra-ops` MCP server** — TypeScript wrapper around SendGrid/Cloudflare/GoDaddy/Stripe with credential pre-flight + atomic cross-account migrations + drift detection
+- **Self-healing build loop** — `auto-build.sh` running `claude -p` on stderr until green; pair with `/ship` slash command
+
+These are NOT one-shot session work — design and build them in dedicated sessions against a target project.
