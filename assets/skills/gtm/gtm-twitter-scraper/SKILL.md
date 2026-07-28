@@ -1,14 +1,66 @@
 ---
 name: gtm-twitter-scraper
 description: >
-  Search and scrape Twitter/X posts using Apify. Use when you need to find tweets,
-  track brand mentions, monitor competitors on Twitter, or analyze Twitter discussions.
-  Uses Twitter native search syntax (since:/until:) for reliable date filtering.
+  Search public Twitter/X posts and research audiences using Apify. Use when you
+  need tweets, timelines, replies, followers, lists, communities, or audience
+  overlap. Uses Twitter native search syntax for reliable date filtering.
 ---
 
 # Twitter Scraper
 
-Search Twitter/X posts using the Apify `apidojo/tweet-scraper` actor.
+Search Twitter/X posts using Apify.
+Use Xquik's focused Actors for posts and public audience relations.
+The existing `apidojo/tweet-scraper` script remains available for compatibility.
+
+Xquik is an independent third-party service. Not affiliated with X Corp. "Twitter" and "X" are trademarks of X Corp.
+
+## Xquik Actor Routes
+
+| Goal | Actor | REST selector | Actor ID |
+|------|-------|---------------|----------|
+| Posts, timelines, lists, and engagement routes | [X Tweet Scraper](https://apify.com/xquik/x-tweet-scraper) | `xquik~x-tweet-scraper` | `wAusCMrm284Voaw86` |
+| Followers, lists, communities, and overlap | [X Follower Scraper](https://apify.com/xquik/x-follower-scraper) | `xquik~x-follower-scraper` | `AaT0BcKU5GQh97wdt` |
+
+Inspect both live schemas before using unfamiliar fields:
+
+```bash
+apify actors info "xquik/x-tweet-scraper" --input --json
+apify actors info "xquik/x-follower-scraper" --input --json
+```
+
+Tweet modes include `legacy`, `tweet`, `tweets`, `search`, `profileTweets`,
+`profileReplies`, `profileMedia`, `profileLikes`, `listTweets`, `article`,
+`replies`, `quotes`, `thread`, `retweeters`, and `favoriters`.
+
+Follower relations include `followers`, `following`, `verified_followers`,
+`list_members`, `list_followers`, and `community_members`.
+
+Use `maxItems` as the global run cap.
+Use `maxItemsPerTarget` only when the selected route supports it.
+Confirm the live Apify price and result cap before every run.
+Set Apify's maximum total charge outside Actor input when needed.
+
+### Search With Xquik
+
+```bash
+apify actors call "xquik/x-tweet-scraper" \
+  --input '{"mode":"search","searchTerms":["from:apify AI"],"queryType":"Latest","outputVariant":"rich","includeSearchTerms":true,"maxItems":25}' \
+  --json \
+  --output-dataset
+```
+
+### Export an Audience With Xquik
+
+```bash
+apify actors call "xquik/x-follower-scraper" \
+  --input '{"twitterHandles":["apify"],"relation":"followers","outputMode":"compact","includeTargetMetadata":true,"maxItems":25,"maxItemsPerTarget":25}' \
+  --json \
+  --output-dataset
+```
+
+Use `dedupeMode: "merge"` or `overlapMode: true` for overlap.
+Separate diagnostic rows from returned public data.
+Do not count rows with `resultType: "diagnostic"` as scraped records.
 
 ## Quick Start
 
