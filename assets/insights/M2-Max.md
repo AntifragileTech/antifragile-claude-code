@@ -91,3 +91,33 @@ Decision rules:
 
 These are infrastructure recommendations from the insights report. They are NOT installed automatically because they require user-controlled credentials or are too noisy to apply globally. Install on demand:
 
+## Scratchpad & Temp-Disk Hygiene (Insights 2026-09-30 Sumits-M2-Max)
+> **INVARIANT-adjacent safety rule.** Extends "## Large File Handling Rules" and "## Sub-Agent /
+> Parallel Task Rules". Precedent: on 30-Sep-2026 the Mac's free space fell from ~300-400 GB to
+> <100 GB. Root cause was NOT project data — it was **`/private/tmp/claude-501/` (the Claude Code
+> scratchpad) at 215 GB**, ~207 GB of it disposable mutation-test / full-test-gate working copies
+> (`myproject-r2…r6`, each copying the whole repo dozens of times: `mut/` = 37 copies, `fullgates/`
+> = 32 copies) created in a single ~5.5h window and never cleaned up. `du` measured, not `find|stat`
+> (that over-reported 964 GB because the sparse `Docker.raw` shows 926 GB apparent vs 16 GB real —
+> always trust `du` for real allocation, never apparent size).
+
+**Rules for every session (and every mutation-sweep / worktree / parallel run):**
+1. **Clean as you go.** The moment a mutation/test-gate/worktree run finishes, delete its working
+   copies before starting the next. Never let completed-run scratch pile up.
+2. **One working set at a time.** Do not create a fresh full-tree copy per iteration (r2, r3, r4…).
+   Reuse one scratch dir and reset it, or delete the previous one first.
+3. **Never copy the whole repo per mutant.** Mutate a single target module in place, or copy only
+   source + tests. Exclude `data/`, `node_modules/`, `.venv/`, `.git/`, build output, and datasets
+   from every worktree/copy.
+4. **Disk preflight before any large copy.** Check free space first; if under ~50 GB, STOP and clean
+   before continuing. Never let scratch drive the disk below ~30 GB free.
+5. **Scratch is temporary.** Persist real results back into the project, then delete the scratch.
+6. **Clean up at session end / `/save`.** Remove every scratch dir the session created under
+   `/private/tmp/claude-<uid>/…` and confirm with `du` that space was reclaimed.
+7. **Verify.** After cleanup, run `df -h /` and report free space — proven, not assumed.
+
+**Diagnosing "disk suddenly full":** scan the **volume root first**, not just `$HOME` — the fill can
+be outside home (`/private/tmp`, `/private/var/folders`, CoreSimulator). Use `du -shx` per top-level
+dir; measure real allocation with `du`, and remember Docker.raw / disk images are sparse (apparent ≫
+real). Check `lsof +L1` for deleted-but-open files a running process still holds.
+
